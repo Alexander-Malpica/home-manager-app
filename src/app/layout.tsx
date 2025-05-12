@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
+import ThemeRegistry from "@/theme/ThemeRegistry";
 
 export default function RootLayout({
   children,
@@ -9,7 +10,9 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body>{children}</body>
+        <body>
+          <ThemeRegistry>{children}</ThemeRegistry>
+        </body>
       </html>
     </ClerkProvider>
   );

@@ -9,6 +9,7 @@ import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import BuildIcon from "@mui/icons-material/Build";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
+import theme from "@/theme/theme";
 
 const paths = ["/dashboard", "/shopping", "/bills", "/chores", "/maintenance"];
 
@@ -22,15 +23,28 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   return (
-    <Box sx={{ pb: 7, minHeight: "100vh" }}>
+    <Box
+      sx={{ minHeight: "100dvh", bgcolor: theme.palette.background.default }}
+    >
       {children}
-      <Box sx={{ position: "fixed", bottom: 0, left: 0, right: 0 }}>
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderTop: "4px outset #2b6cb0",
+          borderTopLeftRadius: 2,
+          borderTopRightRadius: 2,
+        }}
+      >
         <BottomNavigation
           showLabels
           value={value}
           onChange={(event, newValue) => {
             router.push(paths[newValue]);
           }}
+          sx={{ p: 4 }}
         >
           <BottomNavigationAction label="Dashboard" icon={<DashboardIcon />} />
           <BottomNavigationAction
