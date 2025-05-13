@@ -1,33 +1,72 @@
 "use client";
 
 import { Box, Typography, ListItemText } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
 import ListPaper from "@/components/lists/ListPaper";
+import useLocalStorage from "@/app/hooks/useLocalStorage";
+import { useAuth } from "@clerk/nextjs";
 
-interface Maintenance {
-  name: string;
+interface MaintenanceItem {
+  id?: string;
+  title: string;
   category: string;
   description: string;
   checked?: boolean;
 }
 
-export default function ShoppingPage() {
-  const [items, setItems] = useState<Maintenance[]>([]);
+export default function MaintenancePage() {
+  const [items, setItems] = useLocalStorage<MaintenanceItem[]>(
+    "maintenanceItems",
+    []
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const handleAddItem = (item: {
-    name: string;
-    category: string;
-    description: string;
-  }) => {
+  const { isSignedIn } = useAuth();
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    fetch("/api/maintenance")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setItems(data);
+      });
+  }, [isSignedIn, setItems]);
+
+  const handleAddItem = async (item: Omit<MaintenanceItem, "id">) => {
     if (editingIndex !== null) {
+      const existing = items[editingIndex];
+
       const updated = [...items];
-      updated[editingIndex] = item;
+      updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
+
+      // Send PATCH to server
+      if (isSignedIn && existing.id) {
+        await fetch("/api/maintenance/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: existing.id, ...item }),
+        });
+      }
+
+      return;
+    }
+
+    // Add new item
+    if (isSignedIn) {
+      const res = await fetch("/api/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      });
+
+      const savedItem = await res.json();
+      setItems((prev) => [...prev, savedItem]);
     } else {
       setItems((prev) => [...prev, item]);
     }
@@ -36,12 +75,22 @@ export default function ShoppingPage() {
   const handleItemClick = (index: number) => {
     const updated = [...items];
     updated[index].checked = true;
-
     setItems(updated);
 
-    // Auto-remove after 1s
-    setTimeout(() => {
-      setItems((prev) => prev.filter((_, i) => i !== index));
+    const itemToRemove = items[index];
+
+    // Remove after delay
+    setTimeout(async () => {
+      const filtered = items.filter((_, i) => i !== index);
+      setItems(filtered);
+
+      if (isSignedIn && itemToRemove.id) {
+        await fetch("/api/maintenance/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: itemToRemove.id }),
+        });
+      }
     }, 500);
   };
 
@@ -67,7 +116,7 @@ export default function ShoppingPage() {
           onEditClick={handleEditClick}
           renderItemText={(item) => (
             <ListItemText
-              primary={item.name}
+              primary={item.title}
               secondary={item.category}
               sx={{
                 textDecoration: item.checked ? "line-through" : "none",

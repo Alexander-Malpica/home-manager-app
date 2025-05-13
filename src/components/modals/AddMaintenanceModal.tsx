@@ -29,27 +29,27 @@ export default function AddMaintenanceModal({
   open: boolean;
   onClose: () => void;
   onSubmit: (item: {
-    name: string;
+    title: string;
     category: string;
     description: string;
   }) => void;
-  item?: { name: string; category: string; description: string } | null;
+  item?: { title: string; category: string; description: string } | null;
 }) {
-  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
   const [category, setCategory] = useState(maintenanceCategories[0]);
   const [description, setDescription] = useState("");
 
   const handleAdd = () => {
-    if (!name || !description) return;
-    onSubmit({ name, category, description });
-    setName("");
+    if (!title || !description) return;
+    onSubmit({ title, category, description });
+    setTitle("");
     setCategory(maintenanceCategories[0]);
     setDescription("");
     onClose();
   };
 
   useEffect(() => {
-    setName(item?.name || "");
+    setTitle(item?.title || "");
     setCategory(item?.category || maintenanceCategories[0]);
     setDescription(item?.description || "");
   }, [item, open]);
@@ -64,8 +64,9 @@ export default function AddMaintenanceModal({
         >
           <TextField
             label="Task Title"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            sx={{ mt: 1 }}
           />
           <TextField
             label="Category"

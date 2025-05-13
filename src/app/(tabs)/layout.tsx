@@ -10,6 +10,7 @@ import BuildIcon from "@mui/icons-material/Build";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
 import theme from "@/theme/theme";
+import Navbar from "@/components/navigation/Navbar";
 
 const paths = ["/dashboard", "/shopping", "/bills", "/chores", "/maintenance"];
 
@@ -26,6 +27,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
     <Box
       sx={{ minHeight: "100dvh", bgcolor: theme.palette.background.default }}
     >
+      <Navbar />
       {children}
       <Box
         sx={{

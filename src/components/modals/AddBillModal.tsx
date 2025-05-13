@@ -69,6 +69,7 @@ export default function AddBillModal({
             label="Bill Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            sx={{ mt: 1 }}
           />
           <TextField
             label="Amount"

@@ -13,34 +13,34 @@ const summaryItems = [
   {
     label: "Total Expenses",
     value: 0,
-    icon: <AttachMoneyIcon fontSize="large" color="primary" />,
+    icon: <AttachMoneyIcon fontSize="medium" color="primary" />,
   },
   {
     label: "Unpaid Bills",
     value: 0,
-    icon: <ReceiptIcon fontSize="large" color="primary" />,
+    icon: <ReceiptIcon fontSize="medium" color="primary" />,
   },
   {
     label: "Pending Chores",
     value: 0,
-    icon: <CleaningServicesIcon fontSize="large" color="primary" />,
+    icon: <CleaningServicesIcon fontSize="medium" color="primary" />,
   },
   {
     label: "Shopping Items",
     value: 0,
-    icon: <ShoppingCartIcon fontSize="large" color="primary" />,
+    icon: <ShoppingCartIcon fontSize="medium" color="primary" />,
   },
   {
     label: "Maintenance Tasks",
     value: 0,
-    icon: <BuildIcon fontSize="large" color="primary" />,
+    icon: <BuildIcon fontSize="medium" color="primary" />,
   },
 ];
 
 export default function DashboardPage() {
   return (
     <Box sx={{ height: "100dvh", overflow: "hidden" }}>
-      <Box sx={{ height: "100%", overflowY: "auto", p: 2, mx: "auto" }}>
+      <Box sx={{ p: 2, mx: "auto" }}>
         <Typography variant="h4" gutterBottom>
           Overview
         </Typography>
@@ -53,6 +53,7 @@ export default function DashboardPage() {
                   textAlign: "center",
                   bgcolor: theme.palette.background.paper,
                   border: "2px ridge #f0f0f0",
+                  textWrap: "nowrap",
                 }}
               >
                 <Box>{item.icon}</Box>
@@ -69,7 +70,7 @@ export default function DashboardPage() {
           <Typography variant="h4" gutterBottom>
             Monthly Expenses
           </Typography>
-          <Typography variant="h6" color="text.secondary" mt={1}>
+          <Typography variant="h6" color="text.secondary">
             No expense data to display.
           </Typography>
           {/* Need to add graph of expenses by month */}

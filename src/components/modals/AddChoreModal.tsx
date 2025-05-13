@@ -21,27 +21,27 @@ export default function AddChoreModal({
   onClose: () => void;
   onSubmit: (item: {
     name: string;
-    assignedTo: string;
+    assignee: string;
     description: string;
   }) => void;
-  item?: { name: string; assignedTo: string; description: string } | null;
+  item?: { name: string; assignee: string; description: string } | null;
 }) {
   const [name, setName] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignee, setAssignee] = useState("");
   const [description, setDescription] = useState("");
 
   const handleAdd = () => {
     if (!name) return;
-    onSubmit({ name, assignedTo, description });
+    onSubmit({ name, assignee, description });
     setName("");
-    setAssignedTo("");
+    setAssignee("");
     setDescription("");
     onClose();
   };
 
   useEffect(() => {
     setName(item?.name || "");
-    setAssignedTo(item?.assignedTo || "");
+    setAssignee(item?.assignee || "");
     setDescription(item?.description || "");
   }, [item, open]);
 
@@ -57,11 +57,12 @@ export default function AddChoreModal({
             label="Chore Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            sx={{ mt: 1 }}
           />
           <TextField
             label="Assigned To"
-            value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
           />
           <TextField
             label="Description (optional)"

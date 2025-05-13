@@ -1,12 +1,15 @@
 "use client";
 
+import useLocalStorage from "@/app/hooks/useLocalStorage";
 import ListPaper from "@/components/lists/ListPaper";
 import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
+import { useAuth } from "@clerk/nextjs";
 import { Box, Typography, ListItemText } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface BillsItem {
+  id?: string;
   name: string;
   amount: number;
   dueDate: string;
@@ -15,21 +18,53 @@ interface BillsItem {
 }
 
 export default function BillsPage() {
-  const [items, setItems] = useState<BillsItem[]>([]);
+  const [items, setItems] = useLocalStorage<BillsItem[]>("billsItems", []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const handleAddItem = (item: {
-    name: string;
-    amount: number;
-    dueDate: string;
-    category: string;
-  }) => {
+  const { isSignedIn } = useAuth();
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    fetch("/api/bills")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setItems(data);
+      });
+  }, [isSignedIn, setItems]);
+
+  const handleAddItem = async (item: Omit<BillsItem, "id">) => {
     if (editingIndex !== null) {
+      const existing = items[editingIndex];
+
       const updated = [...items];
-      updated[editingIndex] = item;
+      updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
+
+      // Send PATCH to server
+      if (isSignedIn && existing.id) {
+        await fetch("/api/bills/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: existing.id, ...item }),
+        });
+      }
+
+      return;
+    }
+
+    // Add new item
+    if (isSignedIn) {
+      const res = await fetch("/api/bills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item),
+      });
+
+      const savedItem = await res.json();
+      setItems((prev) => [...prev, savedItem]);
     } else {
       setItems((prev) => [...prev, item]);
     }
@@ -38,12 +73,22 @@ export default function BillsPage() {
   const handleItemClick = (index: number) => {
     const updated = [...items];
     updated[index].checked = true;
-
     setItems(updated);
 
-    // Auto-remove after 1s
-    setTimeout(() => {
-      setItems((prev) => prev.filter((_, i) => i !== index));
+    const itemToRemove = items[index];
+
+    // Remove after delay
+    setTimeout(async () => {
+      const filtered = items.filter((_, i) => i !== index);
+      setItems(filtered);
+
+      if (isSignedIn && itemToRemove.id) {
+        await fetch("/api/bills/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: itemToRemove.id }),
+        });
+      }
     }, 500);
   };
 
