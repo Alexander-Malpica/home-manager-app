@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { SignIn } from "@clerk/nextjs";
 
 export default function HomePage() {
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
-    if (isSignedIn) {
+    setHasHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
       router.push("/dashboard");
     }
-  }, [isSignedIn, router]);
+  }, [isLoaded, isSignedIn, router]);
+
+  if (!hasHydrated || !isLoaded) return null; // Prevent premature rendering
 
   return (
     <main className="flex h-full min-h-screen items-center justify-center px-4">
@@ -27,7 +34,7 @@ export default function HomePage() {
         <div>
           <SignIn
             routing="hash"
-            redirectUrl="/dashboard"
+            fallbackRedirectUrl="/dashboard"
             appearance={{
               elements: {
                 card: "shadow-lg bg-white rounded-lg p-6",

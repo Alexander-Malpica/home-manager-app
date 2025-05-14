@@ -108,7 +108,7 @@ export default function ShoppingPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, minHeight: "100dvh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🛒 Shopping List
       </Typography>
