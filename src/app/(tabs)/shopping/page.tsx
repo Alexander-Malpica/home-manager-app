@@ -7,6 +7,7 @@ import AddShoppingModal from "@/components/modals/AddShoppingModal";
 import ListPaper from "@/components/lists/ListPaper";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface ShoppingItem {
   id?: string;
@@ -23,7 +24,7 @@ export default function ShoppingPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
   // Fetch items from API if signed in
   useEffect(() => {
@@ -106,6 +107,8 @@ export default function ShoppingPage() {
     setEditingIndex(index);
     setModalOpen(true);
   };
+
+  if (!isLoaded) return <LoadingScreen />;
 
   return (
     <Box sx={{ p: 3, minHeight: "100dvh" }}>

@@ -8,8 +8,18 @@ import {
   DialogActions,
   TextField,
   Button,
+  Slide,
 } from "@mui/material";
+import { TransitionProps } from "@mui/material/transitions";
+import React from "react";
 import { useEffect, useState } from "react";
+
+const dialogContentStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  mt: 1,
+};
 
 export default function AddChoreModal({
   open,
@@ -45,14 +55,24 @@ export default function AddChoreModal({
     setDescription(item?.description || "");
   }, [item, open]);
 
+  const Transition = React.forwardRef(function Transition(
+    props: TransitionProps & { children: React.ReactElement },
+    ref: React.Ref<unknown>
+  ) {
+    return <Slide direction="up" ref={ref} {...props} />;
+  });
+
   return (
     <Box>
-      {/* Modal */}
-      <Dialog open={open} onClose={onClose} fullWidth maxWidth={"xs"}>
-        <DialogTitle>Add Shopping Item</DialogTitle>
-        <DialogContent
-          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
-        >
+      <Dialog
+        open={open}
+        onClose={onClose}
+        fullWidth
+        maxWidth="xs"
+        TransitionComponent={Transition}
+      >
+        <DialogTitle>Add Chore</DialogTitle>
+        <DialogContent sx={dialogContentStyle}>
           <TextField
             label="Chore Name"
             value={name}

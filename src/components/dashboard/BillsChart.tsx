@@ -1,41 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { Paper, Typography } from "@mui/material";
+import dynamic from "next/dynamic";
+import { Box, CircularProgress } from "@mui/material";
 
-export default function BillsChart() {
-  const [data, setData] = useState([]);
+// ✅ Lazy-load the full chart and show spinner while loading
+const BillsChartLazy = dynamic(() => import("./BillsChartLazy"), {
+  ssr: false,
+  loading: () => (
+    <Box
+      display="flex"
+      justifyContent="center"
+      alignItems="center"
+      height={300}
+    >
+      <CircularProgress />
+    </Box>
+  ),
+});
 
-  useEffect(() => {
-    async function fetchData() {
-      const res = await fetch("/api/bills/monthly");
-      const json = await res.json();
-      setData(json);
-    }
-    fetchData();
-  }, []);
-
-  return (
-    <Paper sx={{ padding: 2, mt: 4 }}>
-      <Typography variant="h6" gutterBottom>
-        Monthly Bills Overview
-      </Typography>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data}>
-          <XAxis dataKey="month" />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey="total" fill="#1976d2" />
-        </BarChart>
-      </ResponsiveContainer>
-    </Paper>
-  );
-}
+export default BillsChartLazy;

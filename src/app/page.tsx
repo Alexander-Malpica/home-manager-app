@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useEffect } from "react";
+import { useAuth, SignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { SignIn } from "@clerk/nextjs";
+import LoadingScreen from "@/components/LoadingScreen";
+import { Box, Typography } from "@mui/material";
+import Image from "next/image";
 
 export default function HomePage() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, []);
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -20,32 +17,46 @@ export default function HomePage() {
     }
   }, [isLoaded, isSignedIn, router]);
 
-  if (!hasHydrated || !isLoaded) return null; // Prevent premature rendering
+  if (!isLoaded) return <LoadingScreen />;
 
   return (
-    <main className="flex h-full min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-lg text-center flex flex-col items-center justify-center space-y-6">
-        <h1 className="text-4xl font-bold">🏠 Home Manager App</h1>
-        <p className="text-md text-gray-600">
-          Simplify your home life. One app for chores, bills, shopping, and
-          more.
-        </p>
+    <Box
+      minHeight="100vh"
+      display="flex"
+      flexDirection={"column"}
+      alignItems="center"
+      justifyContent="center"
+      px={2}
+    >
+      <Box display="flex" alignItems="center" gap={1}>
+        <Image
+          src="/logo-home-manager.webp"
+          alt="Logo"
+          width={80}
+          height={80}
+          style={{ width: "80px", height: "80px", objectFit: "contain" }}
+          priority
+        />
+        <Typography variant="h4" component="div" fontWeight="bold">
+          Home Manager App
+        </Typography>
+      </Box>
+      <Typography color="text.secondary" mb={5}>
+        Simplify your home life. One app for chores, bills, shopping, and more.
+      </Typography>
 
-        <div>
-          <SignIn
-            routing="hash"
-            fallbackRedirectUrl="/dashboard"
-            appearance={{
-              elements: {
-                card: "shadow-lg bg-white rounded-lg p-6",
-                formButtonPrimary: "bg-blue-600 hover:bg-blue-700 text-white",
-                socialButtonsBlockButton:
-                  "bg-gray-100 hover:bg-gray-200 text-gray-800",
-              },
-            }}
-          />
-        </div>
-      </div>
-    </main>
+      <SignIn
+        routing="hash"
+        fallbackRedirectUrl="/dashboard"
+        appearance={{
+          elements: {
+            card: "shadow-none bg-transparent p-0",
+            formButtonPrimary: "bg-blue-600 hover:bg-blue-700 text-white",
+            socialButtonsBlockButton:
+              "bg-gray-100 hover:bg-gray-200 text-gray-800",
+          },
+        }}
+      />
+    </Box>
   );
 }

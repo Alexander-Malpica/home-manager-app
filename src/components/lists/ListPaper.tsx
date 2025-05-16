@@ -19,7 +19,12 @@ export default function ListPaper<T>({
 }: Props<T>) {
   return (
     <Paper elevation={0} sx={{ bgcolor: "#EBF8FF" }}>
-      <List>
+      <List
+        sx={{
+          minHeight: 200, // ✅ Prevent layout shift on short lists
+          p: 1,
+        }}
+      >
         {items.map((item, i) => (
           <ListItem
             key={i}

@@ -2,6 +2,7 @@
 
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import ListPaper from "@/components/lists/ListPaper";
+import LoadingScreen from "@/components/LoadingScreen";
 import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import { useAuth } from "@clerk/nextjs";
@@ -22,7 +23,7 @@ export default function BillsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -97,8 +98,10 @@ export default function BillsPage() {
     setModalOpen(true);
   };
 
+  if (!isLoaded) return <LoadingScreen />;
+
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, minHeight: "100dvh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         💵 Bills
       </Typography>

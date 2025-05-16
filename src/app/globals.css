@@ -1,12 +1,5 @@
 @import "tailwindcss";
 
-html,
-body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
 /* Completely hide Clerk dev badge */
 .cl-internal-badge {
   display: none !important;

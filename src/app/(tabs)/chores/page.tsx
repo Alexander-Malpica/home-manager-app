@@ -7,6 +7,7 @@ import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddChoreModal from "@/components/modals/AddChoreModal";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth } from "@clerk/nextjs";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface ChoresItem {
   id?: string;
@@ -21,7 +22,7 @@ export default function ChoresPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -101,8 +102,10 @@ export default function ChoresPage() {
     setModalOpen(true);
   };
 
+  if (!isLoaded) return <LoadingScreen />;
+
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, minHeight: "100dvh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🧹 Chores
       </Typography>

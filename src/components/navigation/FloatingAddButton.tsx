@@ -1,5 +1,3 @@
-// app/components/FloatingAddButton.tsx
-
 "use client";
 
 import { Fab } from "@mui/material";
@@ -9,18 +7,20 @@ interface Props {
   onClick: () => void;
 }
 
+const fabStyle = {
+  position: "fixed",
+  bottom: 90,
+  left: "50%",
+  transform: "translateX(-50%)",
+};
+
 export default function FloatingAddButton({ onClick }: Props) {
   return (
     <Fab
       color="primary"
-      aria-label="add"
+      aria-label="Add new item"
       onClick={onClick}
-      sx={{
-        position: "fixed",
-        bottom: 90,
-        left: "50%",
-        transform: "translateX(-50%)",
-      }}
+      sx={fabStyle}
     >
       <AddIcon />
     </Fab>

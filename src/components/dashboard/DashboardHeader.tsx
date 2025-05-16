@@ -1,28 +1,20 @@
-"use client";
+import { Typography, Box } from "@mui/material";
 
-import { useUser } from "@clerk/nextjs";
-import { format } from "date-fns";
+interface Props {
+  name: string;
+  greeting: string;
+  date: string;
+}
 
-const DashboardHeader = () => {
-  const { user } = useUser();
-  const firstName = user?.firstName || "friend";
-
-  const now = new Date();
-  const greeting =
-    now.getHours() < 12
-      ? "Good morning"
-      : now.getHours() < 18
-      ? "Good afternoon"
-      : "Good evening";
-
-  const formattedDate = format(now, "EEEE, MMMM d, yyyy");
-
+export default function DashboardHeader({ name, greeting, date }: Props) {
   return (
-    <div>
-      <h2>{`${greeting}, ${firstName}!`}</h2>
-      <p>{formattedDate}</p>
-    </div>
+    <Box mb={3}>
+      <Typography variant="h4" gutterBottom>
+        {greeting}, {name}!
+      </Typography>
+      <Typography variant="h6" color="text.secondary">
+        {date}
+      </Typography>
+    </Box>
   );
-};
-
-export default DashboardHeader;
+}

@@ -7,6 +7,7 @@ import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
 import ListPaper from "@/components/lists/ListPaper";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth } from "@clerk/nextjs";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface MaintenanceItem {
   id?: string;
@@ -24,7 +25,7 @@ export default function MaintenancePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -99,8 +100,10 @@ export default function MaintenancePage() {
     setModalOpen(true);
   };
 
+  if (!isLoaded) return <LoadingScreen />;
+
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, minHeight: "100dvh" }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🛠️ Maintenance
       </Typography>
