@@ -11,6 +11,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
 import theme from "@/theme/theme";
 import Navbar from "@/components/navigation/Navbar";
+import LoadingScreen from "@/components/LoadingScreen";
+import { useAuth } from "@clerk/nextjs";
 
 const paths = ["/dashboard", "/shopping", "/bills", "/chores", "/maintenance"];
 
@@ -19,9 +21,13 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [value, setValue] = useState(paths.indexOf(pathname));
 
+  const { isLoaded } = useAuth();
+
   useEffect(() => {
     setValue(paths.indexOf(pathname));
   }, [pathname]);
+
+  if (!isLoaded) return <LoadingScreen />;
 
   return (
     <Box
