@@ -4,7 +4,7 @@ import { Box, Typography, ListItemText } from "@mui/material";
 import { useEffect, useState } from "react";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
-import ListPaper from "@/components/lists/ListPaper";
+import ListPaper from "@/components/dashboard/lists/ListPaper";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -14,6 +14,7 @@ interface MaintenanceItem {
   title: string;
   category: string;
   description: string;
+  recurrence: string;
   checked?: boolean;
 }
 
@@ -110,7 +111,7 @@ export default function MaintenancePage() {
 
       {items.length === 0 ? (
         <Typography variant="h6" color="text.secondary">
-          No items in your list.
+          No tasks in your list.
         </Typography>
       ) : (
         <ListPaper

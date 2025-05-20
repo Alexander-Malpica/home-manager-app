@@ -1,13 +1,13 @@
 "use client";
 
 import useLocalStorage from "@/app/hooks/useLocalStorage";
-import ListPaper from "@/components/lists/ListPaper";
+import ListPaper from "@/components/dashboard/lists/ListPaper";
 import LoadingScreen from "@/components/LoadingScreen";
 import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import { useAuth } from "@clerk/nextjs";
 import { Box, Typography, ListItemText } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 interface BillsItem {
   id?: string;
@@ -98,6 +98,12 @@ export default function BillsPage() {
     setModalOpen(true);
   };
 
+  const sortedItems = useMemo(() => {
+    return [...items].sort(
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    );
+  }, [items]);
+
   if (!isLoaded) return <LoadingScreen />;
 
   return (
@@ -112,7 +118,7 @@ export default function BillsPage() {
         </Typography>
       ) : (
         <ListPaper
-          items={items}
+          items={sortedItems}
           onItemClick={handleItemClick}
           onEditClick={handleEditClick}
           renderItemText={(item) => (
@@ -121,7 +127,15 @@ export default function BillsPage() {
               secondary={`$${item.amount} | Due: ${item.dueDate}`}
               sx={{
                 textDecoration: item.checked ? "line-through" : "none",
-                color: item.checked ? "gray" : "inherit",
+                color: item.checked
+                  ? "gray"
+                  : new Date(item.dueDate) < new Date()
+                  ? "red"
+                  : "inherit",
+                fontWeight:
+                  !item.checked && new Date(item.dueDate) < new Date()
+                    ? "bold"
+                    : "normal",
               }}
             />
           )}

@@ -1,18 +1,26 @@
 "use client";
 
-import { Box, Typography, ListItemText } from "@mui/material";
+import {
+  Box,
+  Typography,
+  ListItemText,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@mui/material";
 import { useEffect, useState } from "react";
-import ListPaper from "@/components/lists/ListPaper";
+import ListPaper from "@/components/dashboard/lists/ListPaper";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddChoreModal from "@/components/modals/AddChoreModal";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
 
 interface ChoresItem {
+  createdAt?: string | number | Date;
   id?: string;
   name: string;
   assignee: string;
+  recurrence: string;
   description: string;
   checked?: boolean;
 }
@@ -21,16 +29,27 @@ export default function ChoresPage() {
   const [items, setItems] = useLocalStorage<ChoresItem[]>("choresItems", []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [filter, setFilter] = useState<"all" | "today" | "assigned">("all");
 
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
 
   useEffect(() => {
     if (!isSignedIn) return;
 
     fetch("/api/chores")
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        if (!res.ok) {
+          const error = await res.text();
+          console.error("Failed to fetch chores:", error);
+          return;
+        }
+
+        const data = await res.json();
         if (Array.isArray(data)) setItems(data);
+      })
+      .catch((err) => {
+        console.error("Fetch error:", err);
       });
   }, [isSignedIn, setItems]);
 
@@ -102,7 +121,38 @@ export default function ChoresPage() {
     setModalOpen(true);
   };
 
+  const filteredItems = items.filter((item) => {
+    if (filter === "today") {
+      if (!item.createdAt) return false; // skip if no date
+      const created = new Date(item.createdAt);
+      const today = new Date();
+      return (
+        created.getDate() === today.getDate() &&
+        created.getMonth() === today.getMonth() &&
+        created.getFullYear() === today.getFullYear()
+      );
+    }
+
+    if (filter === "assigned") {
+      return (
+        item.assignee.toLowerCase() === (user?.firstName?.toLowerCase() ?? "")
+      );
+    }
+
+    return true;
+  });
+
   if (!isLoaded) return <LoadingScreen />;
+
+  if (!isSignedIn) {
+    return (
+      <Box p={3}>
+        <Typography variant="h6">
+          Please sign in to access your chores.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3, minHeight: "100dvh" }}>
@@ -110,13 +160,26 @@ export default function ChoresPage() {
         🧹 Chores
       </Typography>
 
-      {items.length === 0 ? (
+      <Box mb={2}>
+        <ToggleButtonGroup
+          value={filter}
+          exclusive
+          onChange={(_, val) => val && setFilter(val)}
+          size="small"
+        >
+          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="today">Today</ToggleButton>
+          <ToggleButton value="assigned">Assigned to Me</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {filteredItems.length === 0 ? (
         <Typography variant="h6" color="text.secondary">
           No chores in your list.
         </Typography>
       ) : (
         <ListPaper
-          items={items}
+          items={filteredItems}
           onItemClick={handleItemClick}
           onEditClick={handleEditClick}
           renderItemText={(item) => (

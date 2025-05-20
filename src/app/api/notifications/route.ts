@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { getOrCreateHousehold } from "@/app/lib/household";
 
-// GET /api/maintenance/count
+// GET /api/notifications
 export async function GET() {
   const { userId } = await auth();
   const user = await currentUser();
   const email = user?.emailAddresses[0]?.emailAddress;
 
-  if (!userId || !email) return NextResponse.json({ count: 0 });
+  if (!userId || !email) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
   const household = await getOrCreateHousehold(userId, email);
 
-  const count = await prisma.maintenanceItem.count({
+  const notifications = await prisma.notification.findMany({
     where: { householdId: household.id },
+    orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({ count });
+  return NextResponse.json(notifications);
 }

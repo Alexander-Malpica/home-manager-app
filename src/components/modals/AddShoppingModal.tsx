@@ -9,10 +9,7 @@ import {
   TextField,
   Button,
   MenuItem,
-  Slide,
 } from "@mui/material";
-import { TransitionProps } from "@mui/material/transitions";
-import React from "react";
 import { useEffect, useState } from "react";
 
 const dialogContentStyle = {
@@ -21,6 +18,7 @@ const dialogContentStyle = {
   gap: 2,
   mt: 1,
 };
+
 const categories = ["Groceries", "Cleaning", "Household", "Other"];
 
 export default function AddShoppingModal({
@@ -50,21 +48,15 @@ export default function AddShoppingModal({
     setCategory(item?.category || categories[0]);
   }, [item, open]);
 
-  const Transition = React.forwardRef(function Transition(
-    props: TransitionProps & { children: React.ReactElement },
-    ref: React.Ref<unknown>
-  ) {
-    return <Slide direction="up" ref={ref} {...props} />;
-  });
-
   return (
     <Box>
+      {/* Modal */}
       <Dialog
         open={open}
         onClose={onClose}
         fullWidth
         maxWidth={"xs"}
-        TransitionComponent={Transition}
+        keepMounted
       >
         <DialogTitle>Add Shopping Item</DialogTitle>
         <DialogContent sx={dialogContentStyle}>

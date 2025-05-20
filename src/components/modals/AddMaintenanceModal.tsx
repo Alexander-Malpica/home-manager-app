@@ -9,10 +9,7 @@ import {
   TextField,
   Button,
   MenuItem,
-  Slide,
 } from "@mui/material";
-import { TransitionProps } from "@mui/material/transitions";
-import React from "react";
 import { useEffect, useState } from "react";
 
 const dialogContentStyle = {
@@ -41,19 +38,27 @@ export default function AddMaintenanceModal({
   onSubmit: (item: {
     title: string;
     category: string;
+    recurrence: string;
     description: string;
   }) => void;
-  item?: { title: string; category: string; description: string } | null;
+  item?: {
+    title: string;
+    category: string;
+    recurrence: string;
+    description: string;
+  } | null;
 }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState(maintenanceCategories[0]);
   const [description, setDescription] = useState("");
+  const [recurrence, setRecurrence] = useState("none");
 
   const handleAdd = () => {
     if (!title || !description) return;
-    onSubmit({ title, category, description });
+    onSubmit({ title, category, recurrence, description });
     setTitle("");
     setCategory(maintenanceCategories[0]);
+    setRecurrence("none");
     setDescription("");
     onClose();
   };
@@ -61,26 +66,21 @@ export default function AddMaintenanceModal({
   useEffect(() => {
     setTitle(item?.title || "");
     setCategory(item?.category || maintenanceCategories[0]);
+    setRecurrence(item?.recurrence || "none");
     setDescription(item?.description || "");
   }, [item, open]);
 
-  const Transition = React.forwardRef(function Transition(
-    props: TransitionProps & { children: React.ReactElement },
-    ref: React.Ref<unknown>
-  ) {
-    return <Slide direction="up" ref={ref} {...props} />;
-  });
-
   return (
     <Box>
+      {/* Modal */}
       <Dialog
         open={open}
         onClose={onClose}
         fullWidth
         maxWidth={"xs"}
-        TransitionComponent={Transition}
+        keepMounted
       >
-        <DialogTitle>Add Maintenance Task</DialogTitle>
+        <DialogTitle>Add Maintenance</DialogTitle>
         <DialogContent sx={dialogContentStyle}>
           <TextField
             label="Task Title"
@@ -100,6 +100,18 @@ export default function AddMaintenanceModal({
               </MenuItem>
             ))}
           </TextField>
+          <TextField
+            label="Recurrence"
+            select
+            value={recurrence}
+            onChange={(e) => setRecurrence(e.target.value)}
+          >
+            <MenuItem value="none">None</MenuItem>
+            <MenuItem value="weekly">Weekly</MenuItem>
+            <MenuItem value="biweekly">BiWeekly</MenuItem>
+            <MenuItem value="monthly">Monthly</MenuItem>
+          </TextField>
+
           <TextField
             label="Description"
             multiline

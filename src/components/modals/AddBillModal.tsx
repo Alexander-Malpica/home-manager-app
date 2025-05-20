@@ -9,9 +9,7 @@ import {
   TextField,
   Button,
   MenuItem,
-  Slide,
 } from "@mui/material";
-import { TransitionProps } from "@mui/material/transitions";
 import React from "react";
 import { useEffect, useState } from "react";
 
@@ -67,22 +65,9 @@ export default function AddBillModal({
     setCategory(item?.category || billCategories[0]);
   }, [item, open]);
 
-  const Transition = React.forwardRef(function Transition(
-    props: TransitionProps & { children: React.ReactElement },
-    ref: React.Ref<unknown>
-  ) {
-    return <Slide direction="up" ref={ref} {...props} />;
-  });
-
   return (
     <Box sx={{ p: 3 }}>
-      <Dialog
-        open={open}
-        onClose={onClose}
-        fullWidth
-        maxWidth="xs"
-        TransitionComponent={Transition}
-      >
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
         <DialogTitle>Add Bill</DialogTitle>
         <DialogContent sx={dialogContentStyle}>
           <TextField

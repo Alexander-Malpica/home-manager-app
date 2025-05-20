@@ -22,7 +22,7 @@ const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: "'Roboto', sans-serif",
+    fontFamily: "Roboto, sans-serif",
   },
   components: {
     MuiListItemText: {

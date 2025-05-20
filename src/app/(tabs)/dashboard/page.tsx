@@ -24,6 +24,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isLoaded) return;
 
+    async function initializeHousehold() {
+      await fetch("/api/household/init");
+    }
+
     async function fetchCounts() {
       const endpoints = {
         bills: "/api/bills/count",
@@ -48,8 +52,10 @@ export default function DashboardPage() {
       setMonthlyData(json);
     }
 
-    fetchCounts();
-    fetchMonthly();
+    initializeHousehold().then(() => {
+      fetchCounts();
+      fetchMonthly();
+    });
   }, [isLoaded]);
 
   if (!isLoaded) return <LoadingScreen />;

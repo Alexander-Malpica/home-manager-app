@@ -1,4 +1,3 @@
-// src/app/(tabs)/layout.tsx
 "use client";
 
 import { BottomNavigation, BottomNavigationAction, Box } from "@mui/material";
@@ -7,6 +6,7 @@ import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import ReceiptIcon from "@mui/icons-material/Receipt";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import BuildIcon from "@mui/icons-material/Build";
+import GroupIcon from "@mui/icons-material/Group";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
 import theme from "@/theme/theme";
@@ -14,7 +14,14 @@ import Navbar from "@/components/navigation/Navbar";
 import LoadingScreen from "@/components/LoadingScreen";
 import { useAuth } from "@clerk/nextjs";
 
-const paths = ["/dashboard", "/shopping", "/bills", "/chores", "/maintenance"];
+const paths = [
+  "/dashboard",
+  "/shopping",
+  "/bills",
+  "/chores",
+  "/maintenance",
+  "/household",
+];
 
 export default function TabsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -31,10 +38,20 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
 
   return (
     <Box
-      sx={{ minHeight: "100dvh", bgcolor: theme.palette.background.default }}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100dvh",
+        bgcolor: theme.palette.background.default,
+      }}
     >
+      {/* Top navbar */}
       <Navbar />
-      {children}
+
+      {/* Scrollable main content */}
+      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>{children}</Box>
+
+      {/* Sticky bottom navigation */}
       <Box
         sx={{
           position: "sticky",
@@ -44,6 +61,8 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           borderTop: "4px outset #2b6cb0",
           borderTopLeftRadius: 2,
           borderTopRightRadius: 2,
+          backgroundColor: "#fff",
+          zIndex: 10,
         }}
       >
         <BottomNavigation
@@ -52,7 +71,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           onChange={(event, newValue) => {
             router.push(paths[newValue]);
           }}
-          sx={{ p: 4 }}
+          sx={{ p: 2 }}
         >
           <BottomNavigationAction label="Dashboard" icon={<DashboardIcon />} />
           <BottomNavigationAction
@@ -65,6 +84,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
             icon={<CleaningServicesIcon />}
           />
           <BottomNavigationAction label="Maintenance" icon={<BuildIcon />} />
+          <BottomNavigationAction label="Household" icon={<GroupIcon />} />
         </BottomNavigation>
       </Box>
     </Box>

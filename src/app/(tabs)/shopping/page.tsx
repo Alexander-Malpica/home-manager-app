@@ -2,12 +2,13 @@
 
 import { Box, Typography, ListItemText } from "@mui/material";
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs"; // 🔄 START: import Clerk auth
+import { useAuth } from "@clerk/nextjs";
 import AddShoppingModal from "@/components/modals/AddShoppingModal";
-import ListPaper from "@/components/lists/ListPaper";
+import ListPaper from "@/components/dashboard/lists/ListPaper";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import LoadingScreen from "@/components/LoadingScreen";
+import groupBy from "lodash/groupBy";
 
 interface ShoppingItem {
   id?: string;
@@ -121,21 +122,40 @@ export default function ShoppingPage() {
           No items in your list.
         </Typography>
       ) : (
-        <ListPaper
-          items={items}
-          onItemClick={handleItemClick}
-          onEditClick={handleEditClick}
-          renderItemText={(item) => (
-            <ListItemText
-              primary={item.name}
-              secondary={item.category}
-              sx={{
-                textDecoration: item.checked ? "line-through" : "none",
-                color: item.checked ? "gray" : "inherit",
-              }}
-            />
-          )}
-        />
+        Object.entries(groupBy(items, "category")).map(
+          ([category, groupItems]) => (
+            <Box key={category} mb={3}>
+              <Typography variant="h6" gutterBottom>
+                {category}
+              </Typography>
+              <ListPaper
+                items={groupItems}
+                onItemClick={(index) => {
+                  const globalIndex = items.findIndex(
+                    (i) => i.id === groupItems[index].id
+                  );
+                  handleItemClick(globalIndex);
+                }}
+                onEditClick={(index) => {
+                  const globalIndex = items.findIndex(
+                    (i) => i.id === groupItems[index].id
+                  );
+                  handleEditClick(globalIndex);
+                }}
+                renderItemText={(item) => (
+                  <ListItemText
+                    primary={item.name}
+                    secondary={item.category}
+                    sx={{
+                      textDecoration: item.checked ? "line-through" : "none",
+                      color: item.checked ? "gray" : "inherit",
+                    }}
+                  />
+                )}
+              />
+            </Box>
+          )
+        )
       )}
 
       {/* Add Button */}

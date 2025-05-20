@@ -8,9 +8,8 @@ import {
   DialogActions,
   TextField,
   Button,
-  Slide,
+  MenuItem,
 } from "@mui/material";
-import { TransitionProps } from "@mui/material/transitions";
 import React from "react";
 import { useEffect, useState } from "react";
 
@@ -32,20 +31,28 @@ export default function AddChoreModal({
   onSubmit: (item: {
     name: string;
     assignee: string;
+    recurrence: string;
     description: string;
   }) => void;
-  item?: { name: string; assignee: string; description: string } | null;
+  item?: {
+    name: string;
+    assignee: string;
+    recurrence: string;
+    description: string;
+  } | null;
 }) {
   const [name, setName] = useState("");
   const [assignee, setAssignee] = useState("");
   const [description, setDescription] = useState("");
+  const [recurrence, setRecurrence] = useState("none");
 
   const handleAdd = () => {
     if (!name) return;
-    onSubmit({ name, assignee, description });
+    onSubmit({ name, assignee, description, recurrence });
     setName("");
     setAssignee("");
     setDescription("");
+    setRecurrence("none");
     onClose();
   };
 
@@ -53,24 +60,12 @@ export default function AddChoreModal({
     setName(item?.name || "");
     setAssignee(item?.assignee || "");
     setDescription(item?.description || "");
+    setRecurrence(item?.recurrence || "none");
   }, [item, open]);
-
-  const Transition = React.forwardRef(function Transition(
-    props: TransitionProps & { children: React.ReactElement },
-    ref: React.Ref<unknown>
-  ) {
-    return <Slide direction="up" ref={ref} {...props} />;
-  });
 
   return (
     <Box>
-      <Dialog
-        open={open}
-        onClose={onClose}
-        fullWidth
-        maxWidth="xs"
-        TransitionComponent={Transition}
-      >
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
         <DialogTitle>Add Chore</DialogTitle>
         <DialogContent sx={dialogContentStyle}>
           <TextField
@@ -84,6 +79,18 @@ export default function AddChoreModal({
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
           />
+          <TextField
+            label="Recurrence"
+            select
+            value={recurrence}
+            onChange={(e) => setRecurrence(e.target.value)}
+          >
+            <MenuItem value="none">None</MenuItem>
+            <MenuItem value="weekly">Weekly</MenuItem>
+            <MenuItem value="biweekly">BiWeekly</MenuItem>
+            <MenuItem value="monthly">Monthly</MenuItem>
+          </TextField>
+
           <TextField
             label="Description (optional)"
             value={description}

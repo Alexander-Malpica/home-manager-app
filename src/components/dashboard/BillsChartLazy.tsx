@@ -8,11 +8,12 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
 } from "recharts";
 import theme from "@/theme/theme";
 
 interface Props {
-  data: { month: string; total: number }[];
+  data: { month: string; total: number; paid: number }[];
 }
 
 export default function BillsChartLazy({ data }: Props) {
@@ -27,7 +28,17 @@ export default function BillsChartLazy({ data }: Props) {
             <XAxis dataKey="month" />
             <YAxis />
             <Tooltip />
-            <Bar dataKey="total" fill={theme.palette.primary.main} />
+            <Legend />
+            <Bar
+              dataKey="total"
+              name="Total Bills"
+              fill={theme.palette.primary.main}
+            />
+            {/* <Bar
+              dataKey="paid"
+              name="Paid Bills"
+              fill={theme.palette.success.main}
+            /> */}
           </BarChart>
         </ResponsiveContainer>
       </Paper>
