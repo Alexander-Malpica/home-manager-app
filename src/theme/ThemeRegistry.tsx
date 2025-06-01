@@ -4,8 +4,9 @@ import * as React from "react";
 import { useMemo } from "react";
 import { CacheProvider } from "@emotion/react";
 import { ThemeProvider, CssBaseline } from "@mui/material";
-import theme from "./theme";
+import { lightTheme, darkTheme } from "./theme";
 import createEmotionCache from "./emotionCache";
+import { ColorModeProvider } from "./ColorModeContext";
 
 export default function ThemeRegistry({
   children,
@@ -20,10 +21,14 @@ export default function ThemeRegistry({
 
   return (
     <CacheProvider value={cache}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {children}
-      </ThemeProvider>
+      <ColorModeProvider>
+        {(mode: string) => (
+          <ThemeProvider theme={mode === "dark" ? darkTheme : lightTheme}>
+            <CssBaseline />
+            {children}
+          </ThemeProvider>
+        )}
+      </ColorModeProvider>
     </CacheProvider>
   );
 }

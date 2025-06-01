@@ -1,15 +1,22 @@
 "use client";
 
-import { BottomNavigation, BottomNavigationAction, Box } from "@mui/material";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import ReceiptIcon from "@mui/icons-material/Receipt";
-import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
-import BuildIcon from "@mui/icons-material/Build";
-import GroupIcon from "@mui/icons-material/Group";
+import {
+  BottomNavigation,
+  BottomNavigationAction,
+  Box,
+  useMediaQuery,
+} from "@mui/material";
+import {
+  Dashboard as DashboardIcon,
+  ShoppingCart as ShoppingCartIcon,
+  Receipt as ReceiptIcon,
+  CleaningServices as CleaningServicesIcon,
+  Build as BuildIcon,
+  Group as GroupIcon,
+} from "@mui/icons-material";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
-import theme from "@/theme/theme";
+import { useTheme } from "@mui/material/styles";
 import Navbar from "@/components/navigation/Navbar";
 import LoadingScreen from "@/components/LoadingScreen";
 import { useAuth } from "@clerk/nextjs";
@@ -26,6 +33,8 @@ const paths = [
 export default function TabsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [value, setValue] = useState(paths.indexOf(pathname));
 
   const { isLoaded } = useAuth();
@@ -45,33 +54,51 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
         bgcolor: theme.palette.background.default,
       }}
     >
-      {/* Top navbar */}
       <Navbar />
 
       {/* Scrollable main content */}
-      <Box sx={{ flex: 1, overflowY: "auto", p: 3 }}>{children}</Box>
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          px: { xs: 2, sm: 3 },
+          pt: 0, // ✅ remove top padding to eliminate gap
+          pb: 3, // ✅ keep bottom padding for spacing above nav
+        }}
+      >
+        {children}
+      </Box>
 
-      {/* Sticky bottom navigation */}
+      {/* Responsive sticky bottom nav */}
       <Box
         sx={{
           position: "sticky",
           bottom: 0,
           left: 0,
           right: 0,
-          borderTop: "4px outset #2b6cb0",
+          borderTop: `4px outset ${theme.palette.primary.main}`,
           borderTopLeftRadius: 2,
           borderTopRightRadius: 2,
-          backgroundColor: "#fff",
+          bgcolor: theme.palette.background.paper,
           zIndex: 10,
         }}
       >
         <BottomNavigation
           showLabels
           value={value}
-          onChange={(event, newValue) => {
+          onChange={(_, newValue) => {
             router.push(paths[newValue]);
           }}
-          sx={{ p: 2 }}
+          sx={{
+            p: isMobile ? 1 : 2,
+            ".MuiBottomNavigationAction-root": {
+              minWidth: 0,
+              padding: isMobile ? "6px 8px" : "8px 16px",
+            },
+            ".MuiSvgIcon-root": {
+              fontSize: isMobile ? "1.4rem" : "1.75rem",
+            },
+          }}
         >
           <BottomNavigationAction label="Dashboard" icon={<DashboardIcon />} />
           <BottomNavigationAction
@@ -83,8 +110,11 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
             label="Chores"
             icon={<CleaningServicesIcon />}
           />
-          <BottomNavigationAction label="Maintenance" icon={<BuildIcon />} />
-          <BottomNavigationAction label="Household" icon={<GroupIcon />} />
+          <BottomNavigationAction
+            label={isMobile ? "Maint." : "Maintenance"}
+            icon={<BuildIcon />}
+          />
+          <BottomNavigationAction label="Group" icon={<GroupIcon />} />
         </BottomNavigation>
       </Box>
     </Box>

@@ -10,19 +10,25 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import theme from "@/theme/theme";
+import { useTheme } from "@mui/material/styles"; // ✅ Use MUI theme hook
 
 interface Props {
   data: { month: string; total: number; paid: number }[];
 }
 
 export default function BillsChartLazy({ data }: Props) {
+  const theme = useTheme(); // ✅ Get dynamic theme (light or dark)
+
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography
+        variant="h3"
+        gutterBottom
+        sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
+      >
         Monthly Expenses
       </Typography>
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
             <XAxis dataKey="month" />
@@ -32,13 +38,8 @@ export default function BillsChartLazy({ data }: Props) {
             <Bar
               dataKey="total"
               name="Total Bills"
-              fill={theme.palette.primary.main}
+              fill={theme.palette.primary.main} // ✅ Dynamically styled
             />
-            {/* <Bar
-              dataKey="paid"
-              name="Paid Bills"
-              fill={theme.palette.success.main}
-            /> */}
           </BarChart>
         </ResponsiveContainer>
       </Paper>

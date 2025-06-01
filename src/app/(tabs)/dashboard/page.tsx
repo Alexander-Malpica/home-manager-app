@@ -9,6 +9,12 @@ import SummaryCards from "@/components/dashboard/SummaryCards";
 import BillsChart from "@/components/dashboard/BillsChart";
 import LoadingScreen from "@/components/LoadingScreen";
 
+interface MonthlyBill {
+  month: string;
+  total: number;
+  paid: number;
+}
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
 
@@ -19,43 +25,41 @@ export default function DashboardPage() {
     maintenance: 0,
   });
 
-  const [monthlyData, setMonthlyData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyBill[]>([]);
 
   useEffect(() => {
     if (!isLoaded) return;
 
-    async function initializeHousehold() {
-      await fetch("/api/household/init");
-    }
+    const initialize = async () => {
+      try {
+        await fetch("/api/household/init");
 
-    async function fetchCounts() {
-      const endpoints = {
-        bills: "/api/bills/count",
-        chores: "/api/chores/count",
-        shopping: "/api/shopping/count",
-        maintenance: "/api/maintenance/count",
-      };
+        const endpoints = {
+          bills: "/api/bills/count",
+          chores: "/api/chores/count",
+          shopping: "/api/shopping/count",
+          maintenance: "/api/maintenance/count",
+        };
 
-      const data = await Promise.all(
-        Object.entries(endpoints).map(async ([key, url]) => {
-          const res = await fetch(url);
-          const json = await res.json();
-          return [key, json.count];
-        })
-      );
-      setCounts(Object.fromEntries(data));
-    }
+        const data = await Promise.all(
+          Object.entries(endpoints).map(async ([key, url]) => {
+            const res = await fetch(url);
+            const json = await res.json();
+            return [key, json.count ?? 0];
+          })
+        );
 
-    async function fetchMonthly() {
-      const res = await fetch("/api/bills/monthly");
-      const json = await res.json();
-      setMonthlyData(json);
-    }
+        setCounts(Object.fromEntries(data));
 
-    initializeHousehold().then(() => {
-      fetchCounts();
-      fetchMonthly();
-    });
+        const res = await fetch("/api/bills/monthly");
+        const json = await res.json();
+        setMonthlyData(Array.isArray(json) ? json : []);
+      } catch (err) {
+        console.error("Dashboard load failed:", err);
+      }
+    };
+
+    initialize();
   }, [isLoaded]);
 
   if (!isLoaded) return <LoadingScreen />;
@@ -69,6 +73,7 @@ export default function DashboardPage() {
       : now.getHours() < 18
       ? "Good afternoon"
       : "Good evening";
+
   const formattedDate = format(now, "EEEE, MMMM d, yyyy");
 
   return (
@@ -77,7 +82,6 @@ export default function DashboardPage() {
         p: 2,
         mx: "auto",
         overflowY: "auto",
-        minHeight: "100dvh",
         boxSizing: "border-box",
       }}
     >
@@ -86,8 +90,12 @@ export default function DashboardPage() {
         greeting={greeting}
         date={formattedDate}
       />
-      <SummaryCards counts={counts} />
-      <BillsChart data={monthlyData} />
+      <Box px={{ xs: 2, sm: 3 }}>
+        <SummaryCards counts={counts} />
+        <Box mt={4}>
+          <BillsChart data={monthlyData} />
+        </Box>
+      </Box>
     </Box>
   );
 }

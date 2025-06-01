@@ -4,7 +4,6 @@ import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import ReceiptIcon from "@mui/icons-material/Receipt";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import BuildIcon from "@mui/icons-material/Build";
-import theme from "@/theme/theme";
 
 interface Props {
   counts: {
@@ -32,7 +31,6 @@ export default function SummaryCards({ counts }: Props) {
       value: counts.chores,
       icon: <CleaningServicesIcon fontSize="medium" color="primary" />,
     },
-
     {
       label: "Maintenance Tasks",
       value: counts.maintenance,
@@ -41,23 +39,26 @@ export default function SummaryCards({ counts }: Props) {
   ];
 
   return (
-    <Grid container spacing={2} mb={4}>
+    <Grid container spacing={2} sx={{ mb: 4 }}>
       {summaryItems.map((item, index) => (
-        <Grid item xs={6} sm={4} md={3} key={index}>
+        <Grid key={index} item xs={6} sm={6} md={3}>
           <Paper
             sx={{
-              p: 2,
+              p: { xs: 2, md: 3 },
               textAlign: "center",
-              bgcolor: theme.palette.background.paper,
-              border: "2px ridge #f0f0f0",
-              textWrap: "nowrap",
+              height: "100%", // ✅ ensures uniform height
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
             }}
           >
-            <Box>{item.icon}</Box>
-            <Typography variant="h6" color="text.primary">
+            <Box display="flex" justifyContent="center" mb={1}>
+              {item.icon}
+            </Box>
+            <Typography variant="h6">{item.label}</Typography>
+            <Typography variant="h4" color="primary">
               {item.value}
             </Typography>
-            <Typography variant="body1">{item.label}</Typography>
           </Paper>
         </Grid>
       ))}

@@ -26,7 +26,8 @@ export default function RootLayout({
     <ClerkProvider appearance={{}}>
       <html lang="en" className={roboto.className} suppressHydrationWarning>
         <head>
-          <meta name="emotion-insertion-point" content="" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          {/* <meta name="emotion-insertion-point" content="" /> */}
           <link rel="icon" href="/logo-home-manager.webp" type="image/webp" />
         </head>
         <body>

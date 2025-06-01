@@ -44,6 +44,22 @@ export default function NotificationsModal({
 
   const grouped = groupBy(notifications, "type");
 
+  const handleNotificationClick = async (id: string) => {
+    await fetch("/api/notifications/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const handleMarkAllAsRead = async () => {
+    await fetch("/api/notifications/clear", { method: "POST" });
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    onClose();
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Notifications</DialogTitle>
@@ -58,7 +74,16 @@ export default function NotificationsModal({
               </Typography>
               <List>
                 {group.map((n) => (
-                  <ListItem key={n.id} divider>
+                  <ListItem
+                    key={n.id}
+                    divider
+                    component="div"
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { backgroundColor: "action.hover" },
+                    }}
+                    onClick={() => handleNotificationClick(n.id)}
+                  >
                     <ListItemText primary={n.title} secondary={n.body} />
                     {!n.read && (
                       <Chip label="Unread" size="small" color="primary" />
@@ -71,14 +96,7 @@ export default function NotificationsModal({
         )}
       </DialogContent>
       <DialogActions>
-        <Button
-          onClick={async () => {
-            await fetch("/api/notifications/clear", { method: "POST" });
-            setNotifications([]); // clear UI after deletion
-            onClose(); // close modal
-          }}
-          color="primary"
-        >
+        <Button onClick={handleMarkAllAsRead} color="primary">
           Mark All as Read
         </Button>
       </DialogActions>

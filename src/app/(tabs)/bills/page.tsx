@@ -7,6 +7,7 @@ import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import { useAuth } from "@clerk/nextjs";
 import { Box, Typography, ListItemText } from "@mui/material";
+import EmptyState from "@/components/EmptyState";
 import { useEffect, useState, useMemo } from "react";
 
 interface BillsItem {
@@ -106,16 +107,16 @@ export default function BillsPage() {
 
   if (!isLoaded) return <LoadingScreen />;
 
+  const showEmpty = items.length === 0;
+
   return (
-    <Box sx={{ p: 3, minHeight: "100dvh" }}>
+    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         💵 Bills
       </Typography>
 
-      {items.length === 0 ? (
-        <Typography variant="h6" color="text.secondary">
-          No bills in your list.
-        </Typography>
+      {showEmpty ? (
+        <EmptyState message="No bills yet. Tap + to add one!" />
       ) : (
         <ListPaper
           items={sortedItems}

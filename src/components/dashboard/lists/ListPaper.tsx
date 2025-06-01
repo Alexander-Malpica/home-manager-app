@@ -1,6 +1,13 @@
 "use client";
 
-import { Paper, List, ListItem, IconButton } from "@mui/material";
+import {
+  Paper,
+  List,
+  ListItem,
+  IconButton,
+  Box,
+  useTheme,
+} from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { ReactNode } from "react";
 
@@ -17,34 +24,42 @@ export default function ListPaper<T>({
   onEditClick,
   renderItemText,
 }: Props<T>) {
+  const theme = useTheme();
+  // const isDark = theme.palette.mode === "dark";
+
   return (
-    <Paper elevation={0} sx={{ bgcolor: "#EBF8FF" }}>
-      <List
-        sx={{
-          minHeight: 200, // ✅ Prevent layout shift on short lists
-          p: 1,
-        }}
-      >
+    <Paper
+      elevation={0}
+      sx={{
+        bgcolor: "transparent",
+      }}
+    >
+      <List sx={{ p: 0 }}>
         {items.map((item, i) => (
           <ListItem
             key={i}
             onClick={() => onItemClick(i)}
             sx={{
               cursor: "pointer",
-              transition: "all 0.3s ease",
-              border: "2px solid #707070",
+              transition: "all 0.2s ease",
+              border: `1px solid ${theme.palette.divider}`,
               borderRadius: 1,
-              mb: 1,
-              bgcolor: "#fff",
+              mb: i !== items.length - 1 ? 1.5 : 0,
+              px: 2,
+              py: 1.5,
+              bgcolor: theme.palette.background.paper,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}
           >
-            {renderItemText(item)}
-
+            <Box flex="1">{renderItemText(item)}</Box>
             <IconButton
               onClick={(e) => {
                 e.stopPropagation();
                 onEditClick(i);
               }}
+              color="inherit"
             >
               <EditIcon />
             </IconButton>

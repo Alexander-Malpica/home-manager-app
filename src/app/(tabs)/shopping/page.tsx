@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, Typography, ListItemText } from "@mui/material";
+import EmptyState from "@/components/EmptyState";
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import AddShoppingModal from "@/components/modals/AddShoppingModal";
@@ -111,23 +112,24 @@ export default function ShoppingPage() {
 
   if (!isLoaded) return <LoadingScreen />;
 
+  const showEmpty = items.length === 0;
+
   return (
-    <Box sx={{ p: 3, minHeight: "100dvh" }}>
+    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🛒 Shopping List
       </Typography>
 
-      {items.length === 0 ? (
-        <Typography variant="h6" color="text.secondary">
-          No items in your list.
-        </Typography>
+      {showEmpty ? (
+        <EmptyState message="No shopping items yet. Tap + to add one!" />
       ) : (
         Object.entries(groupBy(items, "category")).map(
           ([category, groupItems]) => (
-            <Box key={category} mb={3}>
+            <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
               <Typography variant="h6" gutterBottom>
                 {category}
               </Typography>
+
               <ListPaper
                 items={groupItems}
                 onItemClick={(index) => {

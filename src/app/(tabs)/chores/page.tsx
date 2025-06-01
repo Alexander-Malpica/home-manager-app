@@ -14,6 +14,7 @@ import AddChoreModal from "@/components/modals/AddChoreModal";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth, useUser } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
+import EmptyState from "@/components/EmptyState";
 
 interface ChoresItem {
   createdAt?: string | number | Date;
@@ -56,13 +57,11 @@ export default function ChoresPage() {
   const handleAddItem = async (item: Omit<ChoresItem, "id">) => {
     if (editingIndex !== null) {
       const existing = items[editingIndex];
-
       const updated = [...items];
       updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      // Send PATCH to server
       if (isSignedIn && existing.id) {
         await fetch("/api/chores/update", {
           method: "POST",
@@ -74,7 +73,6 @@ export default function ChoresPage() {
       return;
     }
 
-    // Add new item
     if (isSignedIn) {
       const res = await fetch("/api/chores", {
         method: "POST",
@@ -101,7 +99,6 @@ export default function ChoresPage() {
 
     const itemToRemove = items[index];
 
-    // Remove after delay
     setTimeout(async () => {
       const filtered = items.filter((_, i) => i !== index);
       setItems(filtered);
@@ -122,8 +119,7 @@ export default function ChoresPage() {
   };
 
   const filteredItems = items.filter((item) => {
-    if (filter === "today") {
-      if (!item.createdAt) return false; // skip if no date
+    if (filter === "today" && item.createdAt) {
       const created = new Date(item.createdAt);
       const today = new Date();
       return (
@@ -146,7 +142,7 @@ export default function ChoresPage() {
 
   if (!isSignedIn) {
     return (
-      <Box p={3}>
+      <Box px={{ xs: 2, sm: 3 }} py={2} p={3}>
         <Typography variant="h6">
           Please sign in to access your chores.
         </Typography>
@@ -154,13 +150,15 @@ export default function ChoresPage() {
     );
   }
 
+  const showEmpty = filteredItems.length === 0;
+
   return (
-    <Box sx={{ p: 3, minHeight: "100dvh" }}>
+    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🧹 Chores
       </Typography>
 
-      <Box mb={2}>
+      <Box px={{ xs: 2, sm: 3 }} py={2} mb={2}>
         <ToggleButtonGroup
           value={filter}
           exclusive
@@ -173,10 +171,8 @@ export default function ChoresPage() {
         </ToggleButtonGroup>
       </Box>
 
-      {filteredItems.length === 0 ? (
-        <Typography variant="h6" color="text.secondary">
-          No chores in your list.
-        </Typography>
+      {showEmpty ? (
+        <EmptyState message="No chores yet. Tap + to add one!" />
       ) : (
         <ListPaper
           items={filteredItems}
@@ -195,10 +191,8 @@ export default function ChoresPage() {
         />
       )}
 
-      {/* Add Button */}
       <FloatingAddButton onClick={() => setModalOpen(true)} />
 
-      {/* Modal */}
       <AddChoreModal
         open={modalOpen}
         onClose={() => {

@@ -2,6 +2,7 @@
 
 import { Box, Typography, ListItemText } from "@mui/material";
 import { useEffect, useState } from "react";
+import EmptyState from "@/components/EmptyState";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
 import ListPaper from "@/components/dashboard/lists/ListPaper";
@@ -41,13 +42,11 @@ export default function MaintenancePage() {
   const handleAddItem = async (item: Omit<MaintenanceItem, "id">) => {
     if (editingIndex !== null) {
       const existing = items[editingIndex];
-
       const updated = [...items];
       updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      // Send PATCH to server
       if (isSignedIn && existing.id) {
         await fetch("/api/maintenance/update", {
           method: "POST",
@@ -59,7 +58,6 @@ export default function MaintenancePage() {
       return;
     }
 
-    // Add new item
     if (isSignedIn) {
       const res = await fetch("/api/maintenance", {
         method: "POST",
@@ -81,7 +79,6 @@ export default function MaintenancePage() {
 
     const itemToRemove = items[index];
 
-    // Remove after delay
     setTimeout(async () => {
       const filtered = items.filter((_, i) => i !== index);
       setItems(filtered);
@@ -103,16 +100,16 @@ export default function MaintenancePage() {
 
   if (!isLoaded) return <LoadingScreen />;
 
+  const showEmpty = items.length === 0;
+
   return (
-    <Box sx={{ p: 3, minHeight: "100dvh" }}>
+    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🛠️ Maintenance
       </Typography>
 
-      {items.length === 0 ? (
-        <Typography variant="h6" color="text.secondary">
-          No tasks in your list.
-        </Typography>
+      {showEmpty ? (
+        <EmptyState message="No maintenance tasks yet. Tap + to add one!" />
       ) : (
         <ListPaper
           items={items}
@@ -131,10 +128,8 @@ export default function MaintenancePage() {
         />
       )}
 
-      {/* Add Button */}
       <FloatingAddButton onClick={() => setModalOpen(true)} />
 
-      {/* Modal */}
       <AddMaintenanceModal
         open={modalOpen}
         onClose={() => {

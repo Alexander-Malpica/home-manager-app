@@ -16,6 +16,7 @@ import Grid from "@mui/material/GridLegacy";
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useTheme } from "@mui/material/styles"; // ✅ added
 
 interface Member {
   id: string;
@@ -31,6 +32,7 @@ export default function HouseholdPage() {
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
   const { user } = useUser();
+  const theme = useTheme(); // ✅ used for dark mode styles
 
   const currentMember = members.find((m) => m.userId === user?.id);
   const isOwner = currentMember?.role === "owner";
@@ -118,13 +120,13 @@ export default function HouseholdPage() {
   };
 
   return (
-    <Container sx={{ py: 4, minHeight: "100dvh" }}>
+    <Container sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom>
         Household Members
       </Typography>
 
       {isOwner && (
-        <Box display="flex" gap={2} mb={3}>
+        <Box px={{ xs: 2, sm: 3 }} py={2} display="flex" gap={2} mb={3}>
           <TextField
             label="Invite by Email"
             value={email}
@@ -142,7 +144,13 @@ export default function HouseholdPage() {
       )}
 
       {loading ? (
-        <Box display="flex" justifyContent="center" mt={4}>
+        <Box
+          px={{ xs: 2, sm: 3 }}
+          py={2}
+          display="flex"
+          justifyContent="center"
+          mt={4}
+        >
           <CircularProgress />
         </Box>
       ) : (
@@ -166,7 +174,13 @@ export default function HouseholdPage() {
                         ? `Name: ${member.name ?? member.userId}`
                         : `Invited: ${member.invitedEmail}`}
                     </Typography>
-                    <Box display="flex" alignItems="center" gap={1}>
+                    <Box
+                      px={{ xs: 2, sm: 3 }}
+                      py={2}
+                      display="flex"
+                      alignItems="center"
+                      gap={1}
+                    >
                       <Typography variant="body2">Role:</Typography>
 
                       {member.userId === user?.id && member.role === "owner" ? (
@@ -174,11 +188,12 @@ export default function HouseholdPage() {
                           variant="body2"
                           fontWeight="bold"
                           sx={{
-                            border: "1px solid #ccc",
                             px: 2,
                             py: 0.5,
                             borderRadius: 1,
-                            bgcolor: "#f5f5f5",
+                            bgcolor: theme.palette.background.paper,
+                            color: theme.palette.text.primary,
+                            border: `1px solid ${theme.palette.divider}`,
                           }}
                         >
                           {member.role.charAt(0).toUpperCase() +
@@ -219,7 +234,13 @@ export default function HouseholdPage() {
 
           {/* Exit button for non-owners */}
           {!isOwner && currentMember && (
-            <Box mt={4} display="flex" justifyContent="center">
+            <Box
+              px={{ xs: 2, sm: 3 }}
+              py={2}
+              mt={4}
+              display="flex"
+              justifyContent="center"
+            >
               <Button
                 variant="outlined"
                 color="error"

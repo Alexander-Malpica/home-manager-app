@@ -1,41 +1,30 @@
+
 import { createTheme } from "@mui/material/styles";
 
-const theme = createTheme({
+export const lightTheme = createTheme({
   palette: {
     mode: "light",
-    primary: {
-      main: "#2B6CB0", // Blue
-    },
-    secondary: {
-      main: "#63B3ED", // Light Blue
-    },
-    background: {
-      default: "#EBF8FF", // Very Light Blue
-      paper: "#FFFFFF", // Card/Dialog background
-    },
-    text: {
-      primary: "#1A202C", // Almost black
-      secondary: "#4A5568", // Muted dark gray
-    },
-    info: {
-      main: "#805AD5", // Purple accent
-    },
+    primary: { main: "#2B6CB0" },
+    secondary: { main: "#63B3ED" },
+    background: { default: "#EBF8FF", paper: "#FFFFFF" },
+    text: { primary: "#1A202C", secondary: "#4A5568" },
+    info: { main: "#805AD5" },
   },
   typography: {
     fontFamily: "Roboto, sans-serif",
   },
-  components: {
-    MuiListItemText: {
-      styleOverrides: {
-        primary: {
-          fontSize: "18px", // or "16px"
-        },
-        secondary: {
-          fontSize: "15px", // or "14px"
-        },
-      },
-    },
-  },
 });
 
-export default theme;
+export const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+    primary: { main: "#63B3ED" },
+    secondary: { main: "#2B6CB0" },
+    background: { default: "#121212", paper: "#1E1E1E" },
+    text: { primary: "#FFFFFF", secondary: "#B0BEC5" },
+    info: { main: "#BB86FC" },
+  },
+  typography: {
+    fontFamily: "Roboto, sans-serif",
+  },
+});
