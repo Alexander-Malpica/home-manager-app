@@ -1,7 +1,8 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import ThemeRegistry from "@/theme/ThemeRegistry";
-import { Roboto } from "next/font/google"; // ✅ Import font
+import { Roboto } from "next/font/google";
+import { PreferencesProvider } from "@/theme/PreferencesContext";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -30,8 +31,10 @@ export default function RootLayout({
           {/* <meta name="emotion-insertion-point" content="" /> */}
           <link rel="icon" href="/logo-home-manager.webp" type="image/webp" />
         </head>
-        <body>
-          <ThemeRegistry>{children}</ThemeRegistry>
+        <body suppressHydrationWarning={true}>
+          <ThemeRegistry>
+            <PreferencesProvider>{children}</PreferencesProvider>
+          </ThemeRegistry>
         </body>
       </html>
     </ClerkProvider>

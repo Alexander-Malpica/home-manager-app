@@ -3,13 +3,15 @@
 import { Box, Typography, ListItemText } from "@mui/material";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import AddShoppingModal from "@/components/modals/AddShoppingModal";
 import ListPaper from "@/components/dashboard/lists/ListPaper";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import LoadingScreen from "@/components/LoadingScreen";
 import groupBy from "lodash/groupBy";
+import { useRouter } from "next/navigation";
+import useAuditLog from "@/app/hooks/useAuditLog";
 
 interface ShoppingItem {
   id?: string;
@@ -27,36 +29,33 @@ export default function ShoppingPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const { addLog } = useAuditLog();
+  const router = useRouter();
 
-  // Fetch items from API if signed in
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  useEffect(() => {
+    if (!isSignedIn || !isLoaded) return;
 
     fetch("/api/shopping")
-      .then((res) => {
-        if (!res.ok) {
-          console.error("Failed to fetch items");
-          return [];
-        }
-        return res.json();
-      })
-      .then((data) => {
-        console.log("Fetched items:", data); // ✅ Add this
-        if (Array.isArray(data)) setItems(data);
-      })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => Array.isArray(data) && setItems(data))
       .catch((err) => console.error("Unexpected error:", err));
-  }, [isSignedIn, setItems]);
+  }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<ShoppingItem, "id">) => {
     if (editingIndex !== null) {
       const existing = items[editingIndex];
-
       const updated = [...items];
       updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      // Send PATCH to server
       if (isSignedIn && existing.id) {
         await fetch("/api/shopping/update", {
           method: "POST",
@@ -68,7 +67,6 @@ export default function ShoppingPage() {
       return;
     }
 
-    // Add new item
     if (isSignedIn) {
       const res = await fetch("/api/shopping", {
         method: "POST",
@@ -78,6 +76,14 @@ export default function ShoppingPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+
+      await addLog({
+        action: "Added item",
+        itemType: "shopping",
+        itemName: savedItem.name,
+        userId: user?.id || "unknown",
+        userName: user?.firstName || "Unknown",
+      });
     } else {
       setItems((prev) => [...prev, item]);
     }
@@ -90,7 +96,6 @@ export default function ShoppingPage() {
 
     const itemToRemove = items[index];
 
-    // Remove after delay
     setTimeout(async () => {
       const filtered = items.filter((_, i) => i !== index);
       setItems(filtered);
@@ -101,6 +106,14 @@ export default function ShoppingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: itemToRemove.id }),
         });
+
+        await addLog({
+          action: "Completed item",
+          itemType: "shopping",
+          itemName: itemToRemove.name,
+          userId: user?.id || "unknown",
+          userName: user?.firstName || "Unknown",
+        });
       }
     }, 500);
   };
@@ -110,8 +123,7 @@ export default function ShoppingPage() {
     setModalOpen(true);
   };
 
-  if (!isLoaded) return <LoadingScreen />;
-
+  if (!isLoaded || !isSignedIn) return <LoadingScreen />;
   const showEmpty = items.length === 0;
 
   return (
@@ -160,10 +172,8 @@ export default function ShoppingPage() {
         )
       )}
 
-      {/* Add Button */}
       <FloatingAddButton onClick={() => setModalOpen(true)} />
 
-      {/* Modal */}
       <AddShoppingModal
         open={modalOpen}
         onClose={() => {

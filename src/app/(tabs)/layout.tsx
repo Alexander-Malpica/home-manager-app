@@ -15,7 +15,7 @@ import {
   Group as GroupIcon,
 } from "@mui/icons-material";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import Navbar from "@/components/navigation/Navbar";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -37,13 +37,22 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [value, setValue] = useState(paths.indexOf(pathname));
 
-  const { isLoaded } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
 
+  // Update selected tab when path changes
   useEffect(() => {
     setValue(paths.indexOf(pathname));
   }, [pathname]);
 
-  if (!isLoaded) return <LoadingScreen />;
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  // Show loading screen while auth state is loading or redirecting
+  if (!isLoaded || !isSignedIn) return <LoadingScreen />;
 
   return (
     <Box
@@ -62,8 +71,8 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           flex: 1,
           overflowY: "auto",
           px: { xs: 2, sm: 3 },
-          pt: 0, // ✅ remove top padding to eliminate gap
-          pb: 3, // ✅ keep bottom padding for spacing above nav
+          pt: 0,
+          pb: 3,
         }}
       >
         {children}

@@ -5,10 +5,12 @@ import ListPaper from "@/components/dashboard/lists/ListPaper";
 import LoadingScreen from "@/components/LoadingScreen";
 import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Box, Typography, ListItemText } from "@mui/material";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import useAuditLog from "@/app/hooks/useAuditLog";
 
 interface BillsItem {
   id?: string;
@@ -25,27 +27,37 @@ export default function BillsPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const { addLog } = useAuditLog();
+  const router = useRouter();
+  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    setIsFetching(true);
     fetch("/api/bills")
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setItems(data);
-      });
-  }, [isSignedIn, setItems]);
+      })
+      .finally(() => setIsFetching(false));
+  }, [isLoaded, isSignedIn, setItems]);
 
   const handleAddItem = async (item: Omit<BillsItem, "id">) => {
     if (editingIndex !== null) {
       const existing = items[editingIndex];
-
       const updated = [...items];
       updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      // Send PATCH to server
       if (isSignedIn && existing.id) {
         await fetch("/api/bills/update", {
           method: "POST",
@@ -57,7 +69,6 @@ export default function BillsPage() {
       return;
     }
 
-    // Add new item
     if (isSignedIn) {
       const res = await fetch("/api/bills", {
         method: "POST",
@@ -67,6 +78,14 @@ export default function BillsPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+
+      await addLog({
+        action: "Added bill",
+        itemType: "bill",
+        itemName: savedItem.name,
+        userId: user?.id || "unknown",
+        userName: user?.firstName || "Unknown",
+      });
     } else {
       setItems((prev) => [...prev, item]);
     }
@@ -79,7 +98,6 @@ export default function BillsPage() {
 
     const itemToRemove = items[index];
 
-    // Remove after delay
     setTimeout(async () => {
       const filtered = items.filter((_, i) => i !== index);
       setItems(filtered);
@@ -89,6 +107,14 @@ export default function BillsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: itemToRemove.id }),
+        });
+
+        await addLog({
+          action: "Marked bill as paid",
+          itemType: "bill",
+          itemName: itemToRemove.name,
+          userId: user?.id || "unknown",
+          userName: user?.firstName || "Unknown",
         });
       }
     }, 500);
@@ -105,7 +131,7 @@ export default function BillsPage() {
     );
   }, [items]);
 
-  if (!isLoaded) return <LoadingScreen />;
+  if (!isLoaded || isFetching) return <LoadingScreen />;
 
   const showEmpty = items.length === 0;
 
@@ -143,10 +169,8 @@ export default function BillsPage() {
         />
       )}
 
-      {/* Add Button */}
       <FloatingAddButton onClick={() => setModalOpen(true)} />
 
-      {/* Modal */}
       <AddBillModal
         open={modalOpen}
         onClose={() => {

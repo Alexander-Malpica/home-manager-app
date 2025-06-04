@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Box } from "@mui/material";
 import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import SummaryCards from "@/components/dashboard/SummaryCards";
@@ -16,7 +17,8 @@ interface MonthlyBill {
 }
 
 export default function DashboardPage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
+  const router = useRouter();
 
   const [counts, setCounts] = useState({
     bills: 0,
@@ -26,11 +28,21 @@ export default function DashboardPage() {
   });
 
   const [monthlyData, setMonthlyData] = useState<MonthlyBill[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
 
+  // 🔒 Redirect if not signed in
   useEffect(() => {
-    if (!isLoaded) return;
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  // ✅ Data fetching after auth check
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
 
     const initialize = async () => {
+      setIsFetching(true);
       try {
         await fetch("/api/household/init");
 
@@ -56,13 +68,21 @@ export default function DashboardPage() {
         setMonthlyData(Array.isArray(json) ? json : []);
       } catch (err) {
         console.error("Dashboard load failed:", err);
+      } finally {
+        setIsFetching(false);
       }
     };
 
     initialize();
-  }, [isLoaded]);
+  }, [isLoaded, isSignedIn]);
 
-  if (!isLoaded) return <LoadingScreen />;
+  if (!isLoaded || isFetching) {
+    return <LoadingScreen />;
+  }
+
+  if (!isSignedIn) {
+    return null; // temporary while redirect happens
+  }
 
   const firstName = user?.firstName || "there";
 

@@ -10,8 +10,7 @@ import {
   Button,
   MenuItem,
 } from "@mui/material";
-import React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const dialogContentStyle = {
   display: "flex",
@@ -44,15 +43,16 @@ export default function AddBillModal({
   } | null;
 }) {
   const [name, setName] = useState("");
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState<string | number>("");
   const [dueDate, setDueDate] = useState("");
   const [category, setCategory] = useState(billCategories[0]);
 
   const handleAdd = () => {
-    if (!name || !amount) return;
-    onSubmit({ name, amount, dueDate, category });
+    const numericAmount = Number(amount);
+    if (!name || amount === "" || isNaN(numericAmount)) return;
+    onSubmit({ name, amount: numericAmount, dueDate, category });
     setName("");
-    setAmount(0);
+    setAmount("");
     setDueDate("");
     setCategory(billCategories[0]);
     onClose();
@@ -60,7 +60,7 @@ export default function AddBillModal({
 
   useEffect(() => {
     setName(item?.name || "");
-    setAmount(item?.amount || 0);
+    setAmount(item?.amount?.toString() || "");
     setDueDate(item?.dueDate || "");
     setCategory(item?.category || billCategories[0]);
   }, [item, open]);
@@ -80,7 +80,10 @@ export default function AddBillModal({
             label="Amount"
             type="number"
             value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
+            onChange={(e) => {
+              const val = e.target.value;
+              setAmount(val === "" ? "" : Number(val));
+            }}
           />
           <TextField
             label="Due Date"

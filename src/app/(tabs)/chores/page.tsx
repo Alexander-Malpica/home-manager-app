@@ -8,6 +8,7 @@ import {
   ToggleButtonGroup,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import ListPaper from "@/components/dashboard/lists/ListPaper";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddChoreModal from "@/components/modals/AddChoreModal";
@@ -15,6 +16,7 @@ import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth, useUser } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
 import EmptyState from "@/components/EmptyState";
+import useAuditLog from "@/app/hooks/useAuditLog"; // ✅ Import the hook
 
 interface ChoresItem {
   createdAt?: string | number | Date;
@@ -34,10 +36,20 @@ export default function ChoresPage() {
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
+  const { addLog } = useAuditLog(); // ✅ Get the log method
+  const router = useRouter();
+  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
 
+  useEffect(() => {
+    if (!isSignedIn || !isLoaded) return;
+
+    setIsFetching(true);
     fetch("/api/chores")
       .then(async (res) => {
         if (!res.ok) {
@@ -45,14 +57,12 @@ export default function ChoresPage() {
           console.error("Failed to fetch chores:", error);
           return;
         }
-
         const data = await res.json();
         if (Array.isArray(data)) setItems(data);
       })
-      .catch((err) => {
-        console.error("Fetch error:", err);
-      });
-  }, [isSignedIn, setItems]);
+      .catch((err) => console.error("Fetch error:", err))
+      .finally(() => setIsFetching(false));
+  }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<ChoresItem, "id">) => {
     if (editingIndex !== null) {
@@ -87,12 +97,26 @@ export default function ChoresPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+
+      // ✅ Log: chore added
+      await addLog({
+        action: "Added chore",
+        itemType: "chore",
+        itemName: savedItem.name,
+        userId: user?.id || "unknown",
+        userName: user?.firstName || "Unknown",
+      });
     } else {
       setItems((prev) => [...prev, item]);
     }
   };
 
-  const handleItemClick = (index: number) => {
+  const handleItemClick = (id: string | undefined) => {
+    if (!id) return;
+
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1) return;
+
     const updated = [...items];
     updated[index].checked = true;
     setItems(updated);
@@ -100,7 +124,7 @@ export default function ChoresPage() {
     const itemToRemove = items[index];
 
     setTimeout(async () => {
-      const filtered = items.filter((_, i) => i !== index);
+      const filtered = items.filter((item) => item.id !== id);
       setItems(filtered);
 
       if (isSignedIn && itemToRemove.id) {
@@ -108,6 +132,15 @@ export default function ChoresPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: itemToRemove.id }),
+        });
+
+        // ✅ Log: chore completed
+        await addLog({
+          action: "Completed chore",
+          itemType: "chore",
+          itemName: itemToRemove.name,
+          userId: user?.id || "unknown",
+          userName: user?.firstName || "Unknown",
         });
       }
     }, 500);
@@ -119,16 +152,6 @@ export default function ChoresPage() {
   };
 
   const filteredItems = items.filter((item) => {
-    if (filter === "today" && item.createdAt) {
-      const created = new Date(item.createdAt);
-      const today = new Date();
-      return (
-        created.getDate() === today.getDate() &&
-        created.getMonth() === today.getMonth() &&
-        created.getFullYear() === today.getFullYear()
-      );
-    }
-
     if (filter === "assigned") {
       return (
         item.assignee.toLowerCase() === (user?.firstName?.toLowerCase() ?? "")
@@ -138,19 +161,9 @@ export default function ChoresPage() {
     return true;
   });
 
-  if (!isLoaded) return <LoadingScreen />;
-
-  if (!isSignedIn) {
-    return (
-      <Box px={{ xs: 2, sm: 3 }} py={2} p={3}>
-        <Typography variant="h6">
-          Please sign in to access your chores.
-        </Typography>
-      </Box>
-    );
-  }
-
   const showEmpty = filteredItems.length === 0;
+
+  if (!isLoaded || isFetching) return <LoadingScreen />;
 
   return (
     <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
@@ -166,7 +179,6 @@ export default function ChoresPage() {
           size="small"
         >
           <ToggleButton value="all">All</ToggleButton>
-          <ToggleButton value="today">Today</ToggleButton>
           <ToggleButton value="assigned">Assigned to Me</ToggleButton>
         </ToggleButtonGroup>
       </Box>
@@ -176,7 +188,7 @@ export default function ChoresPage() {
       ) : (
         <ListPaper
           items={filteredItems}
-          onItemClick={handleItemClick}
+          onItemClick={(index) => handleItemClick(filteredItems[index].id)}
           onEditClick={handleEditClick}
           renderItemText={(item) => (
             <ListItemText

@@ -20,6 +20,13 @@ const dialogContentStyle = {
   mt: 1,
 };
 
+interface Member {
+  id: string;
+  name?: string;
+  invitedEmail?: string | null;
+  userId?: string | null;
+}
+
 export default function AddChoreModal({
   open,
   onClose,
@@ -45,6 +52,7 @@ export default function AddChoreModal({
   const [assignee, setAssignee] = useState("");
   const [description, setDescription] = useState("");
   const [recurrence, setRecurrence] = useState("none");
+  const [members, setMembers] = useState<string[]>([]);
 
   const handleAdd = () => {
     if (!name) return;
@@ -57,10 +65,30 @@ export default function AddChoreModal({
   };
 
   useEffect(() => {
+    // set form values
     setName(item?.name || "");
     setAssignee(item?.assignee || "");
     setDescription(item?.description || "");
     setRecurrence(item?.recurrence || "none");
+
+    // fetch members
+    const fetchMembers = async () => {
+      try {
+        const res = await fetch("/api/household/members");
+        if (!res.ok) throw new Error("Failed to load members");
+
+        const data: Member[] = await res.json();
+        const names = data
+          .map((m) => m.name || m.invitedEmail || m.userId || "")
+          .filter((name) => !!name); // remove empty strings
+
+        setMembers(names);
+      } catch (err) {
+        console.error("Failed to fetch household members:", err);
+      }
+    };
+
+    fetchMembers();
   }, [item, open]);
 
   return (
@@ -76,9 +104,17 @@ export default function AddChoreModal({
           />
           <TextField
             label="Assigned To"
+            select
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
-          />
+          >
+            {members.map((name) => (
+              <MenuItem key={name} value={name}>
+                {name}
+              </MenuItem>
+            ))}
+          </TextField>
+
           <TextField
             label="Recurrence"
             select

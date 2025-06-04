@@ -7,8 +7,10 @@ import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
 import ListPaper from "@/components/dashboard/lists/ListPaper";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
+import { useRouter } from "next/navigation";
+import useAuditLog from "@/app/hooks/useAuditLog";
 
 interface MaintenanceItem {
   id?: string;
@@ -28,16 +30,25 @@ export default function MaintenancePage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const { addLog } = useAuditLog();
+  const router = useRouter();
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  useEffect(() => {
+    if (!isSignedIn || !isLoaded) return;
 
     fetch("/api/maintenance")
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setItems(data);
       });
-  }, [isSignedIn, setItems]);
+  }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<MaintenanceItem, "id">) => {
     if (editingIndex !== null) {
@@ -67,6 +78,14 @@ export default function MaintenancePage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+
+      await addLog({
+        action: "Added maintenance",
+        itemType: "maintenance",
+        itemName: savedItem.title,
+        userId: user?.id || "unknown",
+        userName: user?.firstName || "Unknown",
+      });
     } else {
       setItems((prev) => [...prev, item]);
     }
@@ -89,6 +108,14 @@ export default function MaintenancePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: itemToRemove.id }),
         });
+
+        await addLog({
+          action: "Completed maintenance",
+          itemType: "maintenance",
+          itemName: itemToRemove.title,
+          userId: user?.id || "unknown",
+          userName: user?.firstName || "Unknown",
+        });
       }
     }, 500);
   };
@@ -98,7 +125,7 @@ export default function MaintenancePage() {
     setModalOpen(true);
   };
 
-  if (!isLoaded) return <LoadingScreen />;
+  if (!isLoaded || !isSignedIn) return <LoadingScreen />;
 
   const showEmpty = items.length === 0;
 

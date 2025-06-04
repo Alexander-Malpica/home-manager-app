@@ -14,9 +14,10 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { useTheme } from "@mui/material/styles"; // ✅ added
+import { useTheme } from "@mui/material/styles";
+import { useRouter } from "next/navigation";
 
 interface Member {
   id: string;
@@ -31,13 +32,24 @@ export default function HouseholdPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
+
+  const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
-  const theme = useTheme(); // ✅ used for dark mode styles
+  const theme = useTheme();
+  const router = useRouter();
 
   const currentMember = members.find((m) => m.userId === user?.id);
   const isOwner = currentMember?.role === "owner";
 
   useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  useEffect(() => {
+    if (!isSignedIn || !isLoaded) return;
+
     async function fetchMembers() {
       try {
         const res = await fetch("/api/household/members");
@@ -60,7 +72,7 @@ export default function HouseholdPage() {
     }
 
     fetchMembers();
-  }, []);
+  }, [isSignedIn, isLoaded]);
 
   const handleInvite = async () => {
     if (!email) return;
@@ -119,9 +131,22 @@ export default function HouseholdPage() {
     window.location.reload();
   };
 
+  if (!isLoaded || !isSignedIn || loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="60vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
         Household Members
       </Typography>
 
@@ -143,114 +168,99 @@ export default function HouseholdPage() {
         </Box>
       )}
 
-      {loading ? (
+      <Grid container spacing={2} alignItems="stretch">
+        {members.map((member) => (
+          <Grid item xs={12} md={6} key={member.id}>
+            <Paper
+              sx={{
+                p: 2,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                minHeight: 120,
+                height: "100%",
+              }}
+            >
+              <Box>
+                <Typography variant="subtitle1">
+                  {member.userId
+                    ? `Name: ${member.name ?? member.userId}`
+                    : `Invited: ${member.invitedEmail}`}
+                </Typography>
+                <Box
+                  px={{ xs: 2, sm: 3 }}
+                  py={2}
+                  display="flex"
+                  alignItems="center"
+                  gap={1}
+                >
+                  <Typography variant="body2">Role:</Typography>
+
+                  {member.userId === user?.id && member.role === "owner" ? (
+                    <Typography
+                      variant="body2"
+                      fontWeight="bold"
+                      sx={{
+                        px: 2,
+                        py: 0.5,
+                        borderRadius: 1,
+                        bgcolor: theme.palette.background.paper,
+                        color: theme.palette.text.primary,
+                        border: `1px solid ${theme.palette.divider}`,
+                      }}
+                    >
+                      {member.role.charAt(0).toUpperCase() +
+                        member.role.slice(1)}
+                    </Typography>
+                  ) : isOwner ? (
+                    <>
+                      <Select
+                        size="small"
+                        value={member.role.toLowerCase()}
+                        onChange={(e) =>
+                          handleRoleChange(member.id, e.target.value)
+                        }
+                      >
+                        <MenuItem value="owner">Owner</MenuItem>
+                        <MenuItem value="member">Member</MenuItem>
+                        <MenuItem value="guest">Guest</MenuItem>
+                      </Select>
+                      <IconButton
+                        onClick={() => handleRemove(member.id)}
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </>
+                  ) : (
+                    <Typography variant="body2">
+                      {member.role.charAt(0).toUpperCase() +
+                        member.role.slice(1)}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+
+      {!isOwner && currentMember && (
         <Box
           px={{ xs: 2, sm: 3 }}
           py={2}
+          mt={4}
           display="flex"
           justifyContent="center"
-          mt={4}
         >
-          <CircularProgress />
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => handleExit(currentMember.id)}
+          >
+            Exit Household
+          </Button>
         </Box>
-      ) : (
-        <>
-          <Grid container spacing={2} alignItems="stretch">
-            {members.map((member) => (
-              <Grid item xs={12} md={6} key={member.id}>
-                <Paper
-                  sx={{
-                    p: 2,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    minHeight: 120,
-                    height: "100%",
-                  }}
-                >
-                  <Box>
-                    <Typography variant="subtitle1">
-                      {member.userId
-                        ? `Name: ${member.name ?? member.userId}`
-                        : `Invited: ${member.invitedEmail}`}
-                    </Typography>
-                    <Box
-                      px={{ xs: 2, sm: 3 }}
-                      py={2}
-                      display="flex"
-                      alignItems="center"
-                      gap={1}
-                    >
-                      <Typography variant="body2">Role:</Typography>
-
-                      {member.userId === user?.id && member.role === "owner" ? (
-                        <Typography
-                          variant="body2"
-                          fontWeight="bold"
-                          sx={{
-                            px: 2,
-                            py: 0.5,
-                            borderRadius: 1,
-                            bgcolor: theme.palette.background.paper,
-                            color: theme.palette.text.primary,
-                            border: `1px solid ${theme.palette.divider}`,
-                          }}
-                        >
-                          {member.role.charAt(0).toUpperCase() +
-                            member.role.slice(1)}
-                        </Typography>
-                      ) : isOwner ? (
-                        <>
-                          <Select
-                            size="small"
-                            value={member.role.toLowerCase()}
-                            onChange={(e) =>
-                              handleRoleChange(member.id, e.target.value)
-                            }
-                          >
-                            <MenuItem value="owner">Owner</MenuItem>
-                            <MenuItem value="member">Member</MenuItem>
-                            <MenuItem value="guest">Guest</MenuItem>
-                          </Select>
-                          <IconButton
-                            onClick={() => handleRemove(member.id)}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </>
-                      ) : (
-                        <Typography variant="body2">
-                          {member.role.charAt(0).toUpperCase() +
-                            member.role.slice(1)}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-
-          {/* Exit button for non-owners */}
-          {!isOwner && currentMember && (
-            <Box
-              px={{ xs: 2, sm: 3 }}
-              py={2}
-              mt={4}
-              display="flex"
-              justifyContent="center"
-            >
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={() => handleExit(currentMember.id)}
-              >
-                Exit Household
-              </Button>
-            </Box>
-          )}
-        </>
       )}
     </Container>
   );

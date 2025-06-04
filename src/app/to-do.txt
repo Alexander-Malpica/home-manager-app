@@ -1,0 +1,102 @@
+8. Audit Log
+Track actions: who added a bill, marked a chore done, etc.
+
+Could be local-only for now or pushed to a backend later.
+
+
+
+Here are some enhancements you can apply to your current setup for a better **UX, performance, accessibility, and maintainability** of your app:
+
+---
+
+## ✅ **User Experience (UX) Enhancements**
+
+1. **Skeleton Loaders:**
+   Instead of just `LoadingScreen`, use skeleton loaders on individual components to improve perceived performance.
+
+2. **Toasts or Snackbar Notifications:**
+   Use MUI's `Snackbar` for feedback like successful adds, updates, deletes, or errors.
+
+3. **Drag & Drop Sorting:**
+   Allow drag-and-drop reordering of list items with libraries like `react-beautiful-dnd`.
+
+4. **Undo Actions:**
+   After deleting a chore or item, offer a 5-second undo toast before finalizing it.
+
+---
+
+## ✅ **Authentication & Security**
+
+1. **Role-based Access Control (RBAC):**
+   Ensure certain views and actions (e.g., inviting, assigning roles) are only visible to owners.
+
+2. **Persistent Sessions:**
+   Ensure Clerk settings allow session persistence across reloads and tabs.
+
+---
+
+## ✅ **Performance Optimizations**
+
+1. **Debounced API Calls:**
+   Add debounce for inputs like search or form changes to reduce network usage.
+
+2. **Pagination or Lazy Loading:**
+   If your list of chores, bills, etc., grows, add pagination or infinite scroll.
+
+3. **Optimistic UI Updates:**
+   Update the UI before the server response arrives for actions like adding or removing items.
+
+---
+
+## ✅ **Accessibility (a11y) Improvements**
+
+1. **Keyboard Navigation:**
+   Make sure modals and interactive elements are accessible by keyboard.
+
+2. **ARIA Attributes:**
+   Use `aria-labels`, `role`, etc., on custom buttons or menus for screen readers.
+
+3. **Color Contrast Checks:**
+   Validate dark/light mode contrast for text and background using tools like [axe DevTools](https://www.deque.com/axe/devtools/).
+
+---
+
+## ✅ **Code Quality & Maintainability**
+
+1. **TypeScript Enhancements:**
+
+   * Replace all `any` types.
+   * Define global interfaces for shared data (e.g., User, Chore, Notification).
+
+2. **Modularize API Calls:**
+   Move all `fetch` calls to a separate `lib/api.ts` file for cleaner components.
+
+3. **Central Error Handling:**
+   Create a reusable `useApi` hook to handle loading, error, and response states consistently.
+
+---
+
+## ✅ **Analytics and Logging**
+
+1. **Basic Analytics:**
+   Track actions like chore completion, invite sent, bill paid.
+
+2. **Error Reporting Tools:**
+   Use tools like Sentry or LogRocket to capture runtime errors in production.
+
+---
+
+## ✅ **Visual Improvements**
+
+1. **Theme Customizer:**
+   Let users switch between MUI themes (light, dark, custom palettes).
+
+2. **App Icon & PWA Support:**
+   Add icons, manifest.json, and service worker to make it installable as a mobile PWA.
+
+3. **Better Modals:**
+   Improve modal UX (animation, validation, form layout) for better input handling.
+
+---
+
+Would you like me to help implement or code any of these enhancements?

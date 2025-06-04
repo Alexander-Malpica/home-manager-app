@@ -10,7 +10,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/nextjs": "^6.19.1",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
@@ -18,17 +18,23 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.1.0",
     "@mui/material": "^7.1.0",
+    "@mui/x-data-grid": "^8.5.0",
     "@prisma/client": "^6.8.2",
     "date-fns": "^4.1.0",
+    "file-saver": "^2.0.5",
+    "i18next": "^25.2.1",
     "lodash": "^4.17.21",
     "next": "15.3.2",
+    "next-i18next": "^15.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-i18next": "^15.5.2",
     "recharts": "^2.15.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
     "@types/lodash": "^4.17.16",
     "@types/node": "^20",
     "@types/react": "^19",
