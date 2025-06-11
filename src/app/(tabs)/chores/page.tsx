@@ -6,6 +6,7 @@ import {
   ListItemText,
   ToggleButton,
   ToggleButtonGroup,
+  Container,
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,8 @@ import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth, useUser } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
 import EmptyState from "@/components/EmptyState";
-import useAuditLog from "@/app/hooks/useAuditLog"; // ✅ Import the hook
+import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
 
 interface ChoresItem {
   createdAt?: string | number | Date;
@@ -36,9 +38,12 @@ export default function ChoresPage() {
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
-  const { addLog } = useAuditLog(); // ✅ Get the log method
+  const { addLog } = useAuditLog();
   const router = useRouter();
   const [isFetching, setIsFetching] = useState(false);
+
+  const { role, loading: roleLoading } = useMemberRole(user?.id);
+  const isGuest = role === "guest";
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -65,6 +70,8 @@ export default function ChoresPage() {
   }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<ChoresItem, "id">) => {
+    if (isGuest) return;
+
     if (editingIndex !== null) {
       const existing = items[editingIndex];
       const updated = [...items];
@@ -98,7 +105,6 @@ export default function ChoresPage() {
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
 
-      // ✅ Log: chore added
       await addLog({
         action: "Added chore",
         itemType: "chore",
@@ -112,7 +118,7 @@ export default function ChoresPage() {
   };
 
   const handleItemClick = (id: string | undefined) => {
-    if (!id) return;
+    if (isGuest || !id) return;
 
     const index = items.findIndex((item) => item.id === id);
     if (index === -1) return;
@@ -134,7 +140,6 @@ export default function ChoresPage() {
           body: JSON.stringify({ id: itemToRemove.id }),
         });
 
-        // ✅ Log: chore completed
         await addLog({
           action: "Completed chore",
           itemType: "chore",
@@ -147,6 +152,7 @@ export default function ChoresPage() {
   };
 
   const handleEditClick = (index: number) => {
+    if (isGuest) return;
     setEditingIndex(index);
     setModalOpen(true);
   };
@@ -163,15 +169,21 @@ export default function ChoresPage() {
 
   const showEmpty = filteredItems.length === 0;
 
-  if (!isLoaded || isFetching) return <LoadingScreen />;
+  if (!isLoaded || isFetching || roleLoading) return <LoadingScreen />;
 
   return (
-    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        🧹 Chores
-      </Typography>
+    <Container sx={{ py: 4 }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        flexWrap="wrap"
+        mb={2}
+      >
+        <Typography variant="h4" fontWeight="bold">
+          🧹 Chores
+        </Typography>
 
-      <Box px={{ xs: 2, sm: 3 }} py={2} mb={2}>
         <ToggleButtonGroup
           value={filter}
           exclusive
@@ -189,7 +201,9 @@ export default function ChoresPage() {
         <ListPaper
           items={filteredItems}
           onItemClick={(index) => handleItemClick(filteredItems[index].id)}
-          onEditClick={handleEditClick}
+          onEditClick={(index) => {
+            if (!isGuest) handleEditClick(index);
+          }}
           renderItemText={(item) => (
             <ListItemText
               primary={item.name}
@@ -203,7 +217,7 @@ export default function ChoresPage() {
         />
       )}
 
-      <FloatingAddButton onClick={() => setModalOpen(true)} />
+      {!isGuest && <FloatingAddButton onClick={() => setModalOpen(true)} />}
 
       <AddChoreModal
         open={modalOpen}
@@ -214,6 +228,6 @@ export default function ChoresPage() {
         onSubmit={handleAddItem}
         item={editingIndex !== null ? items[editingIndex] : null}
       />
-    </Box>
+    </Container>
   );
 }

@@ -77,10 +77,14 @@ export default function AddChoreModal({
         const res = await fetch("/api/household/members");
         if (!res.ok) throw new Error("Failed to load members");
 
-        const data: Member[] = await res.json();
-        const names = data
+        const data = await res.json();
+
+        const memberList: Member[] = Array.isArray(data.members)
+          ? data.members
+          : [];
+        const names = memberList
           .map((m) => m.name || m.invitedEmail || m.userId || "")
-          .filter((name) => !!name); // remove empty strings
+          .filter((name) => !!name);
 
         setMembers(names);
       } catch (err) {

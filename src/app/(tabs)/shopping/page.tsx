@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, ListItemText } from "@mui/material";
+import { Box, Typography, ListItemText, Container } from "@mui/material";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
@@ -12,6 +12,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import groupBy from "lodash/groupBy";
 import { useRouter } from "next/navigation";
 import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
 
 interface ShoppingItem {
   id?: string;
@@ -31,7 +32,10 @@ export default function ShoppingPage() {
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { addLog } = useAuditLog();
+  const { role, loading: roleLoading } = useMemberRole(user?.id);
   const router = useRouter();
+
+  const isGuest = role === "guest";
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -49,6 +53,8 @@ export default function ShoppingPage() {
   }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<ShoppingItem, "id">) => {
+    if (isGuest) return;
+
     if (editingIndex !== null) {
       const existing = items[editingIndex];
       const updated = [...items];
@@ -90,6 +96,8 @@ export default function ShoppingPage() {
   };
 
   const handleItemClick = async (index: number) => {
+    if (isGuest) return;
+
     const updated = [...items];
     updated[index].checked = true;
     setItems(updated);
@@ -119,15 +127,17 @@ export default function ShoppingPage() {
   };
 
   const handleEditClick = (index: number) => {
+    if (isGuest) return;
+
     setEditingIndex(index);
     setModalOpen(true);
   };
 
-  if (!isLoaded || !isSignedIn) return <LoadingScreen />;
+  if (!isLoaded || !isSignedIn || roleLoading) return <LoadingScreen />;
   const showEmpty = items.length === 0;
 
   return (
-    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+    <Container sx={{ py: 4 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🛒 Shopping List
       </Typography>
@@ -145,16 +155,20 @@ export default function ShoppingPage() {
               <ListPaper
                 items={groupItems}
                 onItemClick={(index) => {
-                  const globalIndex = items.findIndex(
-                    (i) => i.id === groupItems[index].id
-                  );
-                  handleItemClick(globalIndex);
+                  if (!isGuest) {
+                    const globalIndex = items.findIndex(
+                      (i) => i.id === groupItems[index].id
+                    );
+                    handleItemClick(globalIndex);
+                  }
                 }}
                 onEditClick={(index) => {
-                  const globalIndex = items.findIndex(
-                    (i) => i.id === groupItems[index].id
-                  );
-                  handleEditClick(globalIndex);
+                  if (!isGuest) {
+                    const globalIndex = items.findIndex(
+                      (i) => i.id === groupItems[index].id
+                    );
+                    handleEditClick(globalIndex);
+                  }
                 }}
                 renderItemText={(item) => (
                   <ListItemText
@@ -172,7 +186,7 @@ export default function ShoppingPage() {
         )
       )}
 
-      <FloatingAddButton onClick={() => setModalOpen(true)} />
+      {!isGuest && <FloatingAddButton onClick={() => setModalOpen(true)} />}
 
       <AddShoppingModal
         open={modalOpen}
@@ -183,6 +197,6 @@ export default function ShoppingPage() {
         onSubmit={handleAddItem}
         item={editingIndex !== null ? items[editingIndex] : null}
       />
-    </Box>
+    </Container>
   );
 }

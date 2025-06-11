@@ -57,7 +57,14 @@ export default function Navbar() {
   const menuOpen = Boolean(anchorEl);
 
   const capitalize = (str?: string) =>
-    str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "";
+    str
+      ? str
+          .split(" ")
+          .map(
+            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          )
+          .join(" ")
+      : "";
 
   useEffect(() => {
     const fetchNotifications = async () => {

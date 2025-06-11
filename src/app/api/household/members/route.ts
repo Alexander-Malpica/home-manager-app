@@ -8,7 +8,6 @@ export async function GET(req: NextRequest) {
   const { userId } = getAuth(req);
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
-  // Get the current user from Clerk
   const userRes = await fetch(`https://api.clerk.dev/v1/users/${userId}`, {
     headers: {
       Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
@@ -23,7 +22,6 @@ export async function GET(req: NextRequest) {
   const email = user?.email_addresses?.[0]?.email_address;
   if (!email) return new NextResponse("Unauthorized", { status: 401 });
 
-  // Find household by either userId or invitedEmail
   const household = await prisma.household.findFirst({
     where: {
       members: {
@@ -39,7 +37,30 @@ export async function GET(req: NextRequest) {
     return new NextResponse("No household found", { status: 404 });
   }
 
-  // Resolve each member's name
+  // 🏠 Find the "true" owner (first owner with userId, sorted by id)
+  const sortedOwners = household.members
+    .filter((m) => m.role === "owner" && m.userId)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const trueOwner = sortedOwners[0];
+  let trueOwnerEmail: string | null = null;
+
+  if (trueOwner?.userId) {
+    const ownerRes = await fetch(
+      `https://api.clerk.dev/v1/users/${trueOwner.userId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+        },
+      }
+    );
+    if (ownerRes.ok) {
+      const ownerData = await ownerRes.json();
+      trueOwnerEmail = ownerData?.email_addresses?.[0]?.email_address || null;
+    }
+  }
+
+  // 🧠 Resolve names for members
   const membersWithNames = await Promise.all(
     household.members.map(async (member) => {
       let name = member.invitedEmail || "Unknown";
@@ -71,7 +92,11 @@ export async function GET(req: NextRequest) {
     })
   );
 
-  return NextResponse.json(membersWithNames);
+  return NextResponse.json({
+    members: membersWithNames,
+    trueOwnerId: trueOwner?.userId || null,
+    trueOwnerEmail,
+  });
 }
 
 // POST: Invite user OR update role OR remove member

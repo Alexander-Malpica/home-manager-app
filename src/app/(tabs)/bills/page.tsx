@@ -6,11 +6,12 @@ import LoadingScreen from "@/components/LoadingScreen";
 import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { Box, Typography, ListItemText } from "@mui/material";
+import { Typography, ListItemText, Container } from "@mui/material";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
 
 interface BillsItem {
   id?: string;
@@ -25,12 +26,15 @@ export default function BillsPage() {
   const [items, setItems] = useLocalStorage<BillsItem[]>("billsItems", []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { addLog } = useAuditLog();
   const router = useRouter();
-  const [isFetching, setIsFetching] = useState(false);
+
+  const { role, loading: roleLoading } = useMemberRole(user?.id);
+  const isGuest = role === "guest";
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -51,6 +55,8 @@ export default function BillsPage() {
   }, [isLoaded, isSignedIn, setItems]);
 
   const handleAddItem = async (item: Omit<BillsItem, "id">) => {
+    if (isGuest) return;
+
     if (editingIndex !== null) {
       const existing = items[editingIndex];
       const updated = [...items];
@@ -92,6 +98,8 @@ export default function BillsPage() {
   };
 
   const handleItemClick = (index: number) => {
+    if (isGuest) return;
+
     const updated = [...items];
     updated[index].checked = true;
     setItems(updated);
@@ -121,6 +129,7 @@ export default function BillsPage() {
   };
 
   const handleEditClick = (index: number) => {
+    if (isGuest) return;
     setEditingIndex(index);
     setModalOpen(true);
   };
@@ -131,12 +140,12 @@ export default function BillsPage() {
     );
   }, [items]);
 
-  if (!isLoaded || isFetching) return <LoadingScreen />;
+  if (!isLoaded || isFetching || roleLoading) return <LoadingScreen />;
 
   const showEmpty = items.length === 0;
 
   return (
-    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+    <Container sx={{ py: 4 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         💵 Bills
       </Typography>
@@ -169,7 +178,7 @@ export default function BillsPage() {
         />
       )}
 
-      <FloatingAddButton onClick={() => setModalOpen(true)} />
+      {!isGuest && <FloatingAddButton onClick={() => setModalOpen(true)} />}
 
       <AddBillModal
         open={modalOpen}
@@ -180,6 +189,6 @@ export default function BillsPage() {
         onSubmit={handleAddItem}
         item={editingIndex !== null ? items[editingIndex] : null}
       />
-    </Box>
+    </Container>
   );
 }

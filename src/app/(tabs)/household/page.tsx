@@ -11,13 +11,15 @@ import {
   MenuItem,
   Select,
   IconButton,
+  Avatar,
+  Chip,
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 import { useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@mui/material/styles";
 
 interface Member {
   id: string;
@@ -27,19 +29,29 @@ interface Member {
   name?: string;
 }
 
+function toPascalCase(input: string) {
+  return input
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export default function HouseholdPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState(false);
+  const [householdOwnerId, setHouseholdOwnerId] = useState<string | null>(null);
+  const [trueOwnerEmail, setTrueOwnerEmail] = useState<string | null>(null);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
-  const theme = useTheme();
   const router = useRouter();
+  const theme = useTheme();
 
   const currentMember = members.find((m) => m.userId === user?.id);
   const isOwner = currentMember?.role === "owner";
+  const isTrueOwner = user?.id === householdOwnerId;
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -62,7 +74,9 @@ export default function HouseholdPage() {
         }
 
         const data = await res.json();
-        setMembers(data);
+        setMembers(data.members);
+        setHouseholdOwnerId(data.trueOwnerId);
+        setTrueOwnerEmail(data.trueOwnerEmail);
       } catch (err) {
         console.error("Error fetching household members:", err);
         setMembers([]);
@@ -169,89 +183,111 @@ export default function HouseholdPage() {
       )}
 
       <Grid container spacing={2} alignItems="stretch">
-        {members.map((member) => (
-          <Grid item xs={12} md={6} key={member.id}>
-            <Paper
-              sx={{
-                p: 2,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                minHeight: 120,
-                height: "100%",
-              }}
-            >
-              <Box>
-                <Typography variant="subtitle1">
-                  {member.userId
-                    ? `Name: ${member.name ?? member.userId}`
-                    : `Invited: ${member.invitedEmail}`}
-                </Typography>
-                <Box
-                  px={{ xs: 2, sm: 3 }}
-                  py={2}
-                  display="flex"
-                  alignItems="center"
-                  gap={1}
-                >
-                  <Typography variant="body2">Role:</Typography>
+        {members.map((member) => {
+          const isMemberTrueOwner = member.userId === householdOwnerId;
 
-                  {member.userId === user?.id && member.role === "owner" ? (
-                    <Typography
-                      variant="body2"
-                      fontWeight="bold"
-                      sx={{
-                        px: 2,
-                        py: 0.5,
-                        borderRadius: 1,
-                        bgcolor: theme.palette.background.paper,
-                        color: theme.palette.text.primary,
-                        border: `1px solid ${theme.palette.divider}`,
-                      }}
-                    >
-                      {member.role.charAt(0).toUpperCase() +
-                        member.role.slice(1)}
+          return (
+            <Grid item xs={12} md={6} key={member.id}>
+              <Paper
+                sx={{
+                  p: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  borderRadius: 3,
+                }}
+              >
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Avatar>{member.name?.[0]?.toUpperCase() || "?"}</Avatar>
+
+                  <Box>
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                      <Typography fontWeight="bold">
+                        {toPascalCase(
+                          member.name || member.invitedEmail || "Unknown"
+                        )}
+                      </Typography>
+                      {isMemberTrueOwner && (
+                        <Typography fontSize="1rem" sx={{ color: "#b8860b" }}>
+                          👑
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <Typography variant="body2" color="text.secondary">
+                      {isMemberTrueOwner
+                        ? trueOwnerEmail || member.invitedEmail || "No email"
+                        : member.invitedEmail || "No email"}
                     </Typography>
-                  ) : isOwner ? (
+                  </Box>
+                </Box>
+
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Chip
+                    label={member.role}
+                    size="small"
+                    sx={{
+                      bgcolor:
+                        member.role === "owner"
+                          ? "#b8860b"
+                          : theme.palette.mode === "dark"
+                          ? theme.palette.grey[800]
+                          : theme.palette.grey[200],
+                      color: member.role === "owner" ? "#fff" : "inherit",
+                      textTransform: "capitalize",
+                      fontWeight: 500,
+                    }}
+                  />
+                  <Chip label="active" size="small" color="success" />
+
+                  {isOwner && (
                     <>
-                      <Select
-                        size="small"
-                        value={member.role.toLowerCase()}
-                        onChange={(e) =>
-                          handleRoleChange(member.id, e.target.value)
-                        }
-                      >
-                        <MenuItem value="owner">Owner</MenuItem>
-                        <MenuItem value="member">Member</MenuItem>
-                        <MenuItem value="guest">Guest</MenuItem>
-                      </Select>
-                      <IconButton
-                        onClick={() => handleRemove(member.id)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {/* Only true owner can manage other owners */}
+                      {(member.role !== "owner" || isTrueOwner) &&
+                        !isMemberTrueOwner && (
+                          <>
+                            <Select
+                              size="small"
+                              value={member.role}
+                              onChange={(e) =>
+                                handleRoleChange(member.id, e.target.value)
+                              }
+                              sx={{ minWidth: 100 }}
+                            >
+                              <MenuItem value="owner">Owner</MenuItem>
+                              <MenuItem value="member">Member</MenuItem>
+                              <MenuItem value="guest">Guest</MenuItem>
+                            </Select>
+                            <IconButton
+                              onClick={() => handleRemove(member.id)}
+                              color="error"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </>
+                        )}
                     </>
-                  ) : (
-                    <Typography variant="body2">
-                      {member.role.charAt(0).toUpperCase() +
-                        member.role.slice(1)}
-                    </Typography>
                   )}
                 </Box>
-              </Box>
-            </Paper>
-          </Grid>
-        ))}
+              </Paper>
+            </Grid>
+          );
+        })}
       </Grid>
 
-      {!isOwner && currentMember && (
+      {currentMember && user?.id !== householdOwnerId && (
         <Box
           px={{ xs: 2, sm: 3 }}
           py={2}
           mt={4}
           display="flex"
           justifyContent="center"
+          sx={{
+            position: "fixed",
+            bottom: 90,
+            left: "50%",
+            transform: "translateX(-50%)",
+          }}
         >
           <Button
             variant="outlined"

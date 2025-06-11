@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, ListItemText } from "@mui/material";
+import { Typography, ListItemText, Container } from "@mui/material";
 import { useEffect, useState } from "react";
 import EmptyState from "@/components/EmptyState";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
@@ -11,6 +11,7 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import LoadingScreen from "@/components/LoadingScreen";
 import { useRouter } from "next/navigation";
 import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
 
 interface MaintenanceItem {
   id?: string;
@@ -33,6 +34,7 @@ export default function MaintenancePage() {
   const { user } = useUser();
   const { addLog } = useAuditLog();
   const router = useRouter();
+  const { role, loading: roleLoading } = useMemberRole(user?.id);
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -51,6 +53,8 @@ export default function MaintenancePage() {
   }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<MaintenanceItem, "id">) => {
+    if (role === "guest") return;
+
     if (editingIndex !== null) {
       const existing = items[editingIndex];
       const updated = [...items];
@@ -92,6 +96,8 @@ export default function MaintenancePage() {
   };
 
   const handleItemClick = (index: number) => {
+    if (role === "guest") return;
+
     const updated = [...items];
     updated[index].checked = true;
     setItems(updated);
@@ -121,16 +127,17 @@ export default function MaintenancePage() {
   };
 
   const handleEditClick = (index: number) => {
+    if (role === "guest") return;
     setEditingIndex(index);
     setModalOpen(true);
   };
 
-  if (!isLoaded || !isSignedIn) return <LoadingScreen />;
+  if (!isLoaded || !isSignedIn || roleLoading) return <LoadingScreen />;
 
   const showEmpty = items.length === 0;
 
   return (
-    <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+    <Container sx={{ py: 4 }}>
       <Typography variant="h4" fontWeight="bold" gutterBottom>
         🛠️ Maintenance
       </Typography>
@@ -155,17 +162,20 @@ export default function MaintenancePage() {
         />
       )}
 
-      <FloatingAddButton onClick={() => setModalOpen(true)} />
-
-      <AddMaintenanceModal
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingIndex(null);
-        }}
-        onSubmit={handleAddItem}
-        item={editingIndex !== null ? items[editingIndex] : null}
-      />
-    </Box>
+      {role !== "guest" && (
+        <>
+          <FloatingAddButton onClick={() => setModalOpen(true)} />
+          <AddMaintenanceModal
+            open={modalOpen}
+            onClose={() => {
+              setModalOpen(false);
+              setEditingIndex(null);
+            }}
+            onSubmit={handleAddItem}
+            item={editingIndex !== null ? items[editingIndex] : null}
+          />
+        </>
+      )}
+    </Container>
   );
 }
