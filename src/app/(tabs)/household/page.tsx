@@ -191,18 +191,31 @@ export default function HouseholdPage() {
               <Paper
                 sx={{
                   p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
                   borderRadius: 3,
+                  display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  justifyContent: "space-between",
+                  alignItems: { xs: "flex-start", sm: "center" },
+                  gap: 2,
                 }}
               >
-                <Box display="flex" alignItems="center" gap={2}>
+                {/* Left Side */}
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  gap={2}
+                  minWidth={0}
+                  flex={1}
+                >
                   <Avatar>{member.name?.[0]?.toUpperCase() || "?"}</Avatar>
-
-                  <Box>
-                    <Box display="flex" alignItems="center" gap={0.5}>
-                      <Typography fontWeight="bold">
+                  <Box minWidth={0}>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      gap={0.5}
+                      flexWrap="wrap"
+                    >
+                      <Typography fontWeight="bold" noWrap>
                         {toPascalCase(
                           member.name || member.invitedEmail || "Unknown"
                         )}
@@ -213,8 +226,11 @@ export default function HouseholdPage() {
                         </Typography>
                       )}
                     </Box>
-
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ wordBreak: "break-word" }}
+                    >
                       {isMemberTrueOwner
                         ? trueOwnerEmail || member.invitedEmail || "No email"
                         : member.invitedEmail || "No email"}
@@ -222,7 +238,15 @@ export default function HouseholdPage() {
                   </Box>
                 </Box>
 
-                <Box display="flex" alignItems="center" gap={1}>
+                {/* Right Side */}
+                <Box
+                  display="flex"
+                  flexWrap="wrap"
+                  alignItems="center"
+                  justifyContent="flex-end"
+                  gap={1}
+                  sx={{ mt: { xs: 2, sm: 0 } }}
+                >
                   <Chip
                     label={member.role}
                     size="small"
@@ -240,34 +264,31 @@ export default function HouseholdPage() {
                   />
                   <Chip label="active" size="small" color="success" />
 
-                  {isOwner && (
-                    <>
-                      {/* Only true owner can manage other owners */}
-                      {(member.role !== "owner" || isTrueOwner) &&
-                        !isMemberTrueOwner && (
-                          <>
-                            <Select
-                              size="small"
-                              value={member.role}
-                              onChange={(e) =>
-                                handleRoleChange(member.id, e.target.value)
-                              }
-                              sx={{ minWidth: 100 }}
-                            >
-                              <MenuItem value="owner">Owner</MenuItem>
-                              <MenuItem value="member">Member</MenuItem>
-                              <MenuItem value="guest">Guest</MenuItem>
-                            </Select>
-                            <IconButton
-                              onClick={() => handleRemove(member.id)}
-                              color="error"
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </>
-                        )}
-                    </>
-                  )}
+                  {isOwner &&
+                    (member.role !== "owner" || isTrueOwner) &&
+                    !isMemberTrueOwner && (
+                      <>
+                        <Select
+                          size="small"
+                          value={member.role}
+                          onChange={(e) =>
+                            handleRoleChange(member.id, e.target.value)
+                          }
+                          sx={{ minWidth: 100 }}
+                        >
+                          <MenuItem value="owner">Owner</MenuItem>
+                          <MenuItem value="member">Member</MenuItem>
+                          <MenuItem value="guest">Guest</MenuItem>
+                        </Select>
+                        <IconButton
+                          onClick={() => handleRemove(member.id)}
+                          color="error"
+                          size="small"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </>
+                    )}
                 </Box>
               </Paper>
             </Grid>

@@ -7,6 +7,10 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Container,
+  Skeleton,
+  Snackbar,
+  Alert,
+  Button,
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,10 +19,17 @@ import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import AddChoreModal from "@/components/modals/AddChoreModal";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth, useUser } from "@clerk/nextjs";
-import LoadingScreen from "@/components/LoadingScreen";
 import EmptyState from "@/components/EmptyState";
 import useAuditLog from "@/app/hooks/useAuditLog";
 import { useMemberRole } from "@/app/hooks/useMemberRole";
+import ListSkeleton from "@/components/loaders/SkeletonList";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
+import { useSnackbar, SnackbarKey } from "notistack";
 
 interface ChoresItem {
   createdAt?: string | number | Date;
@@ -35,12 +46,18 @@ export default function ChoresPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "assigned">("all");
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({ open: false, message: "", severity: "success" });
+  const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { addLog } = useAuditLog();
   const router = useRouter();
-  const [isFetching, setIsFetching] = useState(false);
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
   const { role, loading: roleLoading } = useMemberRole(user?.id);
   const isGuest = role === "guest";
@@ -54,7 +71,7 @@ export default function ChoresPage() {
   useEffect(() => {
     if (!isSignedIn || !isLoaded) return;
 
-    setIsFetching(true);
+    setLoadingItems(true);
     fetch("/api/chores")
       .then(async (res) => {
         if (!res.ok) {
@@ -65,8 +82,15 @@ export default function ChoresPage() {
         const data = await res.json();
         if (Array.isArray(data)) setItems(data);
       })
-      .catch((err) => console.error("Fetch error:", err))
-      .finally(() => setIsFetching(false));
+      .catch((err) => {
+        console.error("Fetch error:", err);
+        setSnackbar({
+          open: true,
+          message: "Failed to load items.",
+          severity: "error",
+        });
+      })
+      .finally(() => setLoadingItems(false));
   }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<ChoresItem, "id">) => {
@@ -84,6 +108,11 @@ export default function ChoresPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: existing.id, ...item }),
+        });
+        setSnackbar({
+          open: true,
+          message: "Item updated.",
+          severity: "success",
         });
       }
 
@@ -104,6 +133,7 @@ export default function ChoresPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+      setSnackbar({ open: true, message: "Item added.", severity: "success" });
 
       await addLog({
         action: "Added chore",
@@ -117,38 +147,83 @@ export default function ChoresPage() {
     }
   };
 
-  const handleItemClick = (id: string | undefined) => {
-    if (isGuest || !id) return;
-
-    const index = items.findIndex((item) => item.id === id);
-    if (index === -1) return;
-
-    const updated = [...items];
-    updated[index].checked = true;
-    setItems(updated);
+  const handleItemClick = async (index: number) => {
+    if (isGuest) return;
 
     const itemToRemove = items[index];
+    const deletedId = itemToRemove.id;
+
+    // Optimistically update the UI
+    const updated = [...items];
+    updated.splice(index, 1);
+    setItems(updated);
+
+    const action = (key: SnackbarKey) => (
+      <Button
+        color="secondary"
+        size="small"
+        onClick={() => {
+          setItems((prev) => {
+            const restored = [...prev];
+            restored.splice(index, 0, itemToRemove);
+            return restored;
+          });
+
+          closeSnackbar(key);
+          // Mark the item as not to delete
+          itemAbortMap[deletedId!] = true;
+        }}
+      >
+        Undo
+      </Button>
+    );
+
+    // Keep track if undo was clicked
+    const itemAbortMap: Record<string, boolean> = {};
+
+    enqueueSnackbar("Item deleted", {
+      variant: "info",
+      action,
+      autoHideDuration: 3500,
+      anchorOrigin: { horizontal: "center", vertical: "top" },
+    });
 
     setTimeout(async () => {
-      const filtered = items.filter((item) => item.id !== id);
-      setItems(filtered);
+      if (deletedId && !itemAbortMap[deletedId]) {
+        try {
+          const res = await fetch("/api/chores/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: itemToRemove.id }),
+          });
 
-      if (isSignedIn && itemToRemove.id) {
-        await fetch("/api/chores/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: itemToRemove.id }),
-        });
+          if (!res.ok) {
+            throw new Error("Failed to delete from server");
+          }
 
-        await addLog({
-          action: "Completed chore",
-          itemType: "chore",
-          itemName: itemToRemove.name,
-          userId: user?.id || "unknown",
-          userName: user?.firstName || "Unknown",
-        });
+          await addLog({
+            action: "Completed chore",
+            itemType: "chore",
+            itemName: itemToRemove.name,
+            userId: user?.id || "unknown",
+            userName: user?.firstName || "Unknown",
+          });
+
+          setSnackbar({
+            open: true,
+            message: "Item permanently deleted.",
+            severity: "success",
+          });
+        } catch (error) {
+          console.error(error);
+          setSnackbar({
+            open: true,
+            message: "Server deletion failed.",
+            severity: "error",
+          });
+        }
       }
-    }, 500);
+    }, 4000);
   };
 
   const handleEditClick = (index: number) => {
@@ -157,11 +232,19 @@ export default function ChoresPage() {
     setModalOpen(true);
   };
 
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const newItems = Array.from(items);
+    const [moved] = newItems.splice(result.source.index, 1);
+    newItems.splice(result.destination.index, 0, moved);
+
+    setItems(newItems);
+  };
+
   const filteredItems = items.filter((item) => {
     if (filter === "assigned") {
-      return (
-        item.assignee.toLowerCase() === (user?.firstName?.toLowerCase() ?? "")
-      );
+      return item.assignee.toLowerCase() === user?.fullName;
     }
 
     return true;
@@ -169,7 +252,7 @@ export default function ChoresPage() {
 
   const showEmpty = filteredItems.length === 0;
 
-  if (!isLoaded || isFetching || roleLoading) return <LoadingScreen />;
+  if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
 
   return (
     <Container sx={{ py: 4 }}>
@@ -195,26 +278,68 @@ export default function ChoresPage() {
         </ToggleButtonGroup>
       </Box>
 
-      {showEmpty ? (
+      {loadingItems ? (
+        <Box px={2}>
+          {[1, 2].map((s) => (
+            <Box key={s} mt={3}>
+              <Skeleton height={30} width="30%" />
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} height={60} sx={{ my: 1 }} />
+              ))}
+            </Box>
+          ))}
+        </Box>
+      ) : showEmpty ? (
         <EmptyState message="No chores yet. Tap + to add one!" />
       ) : (
-        <ListPaper
-          items={filteredItems}
-          onItemClick={(index) => handleItemClick(filteredItems[index].id)}
-          onEditClick={(index) => {
-            if (!isGuest) handleEditClick(index);
-          }}
-          renderItemText={(item) => (
-            <ListItemText
-              primary={item.name}
-              secondary={`Assigned to: ${item.assignee} | Description: ${item.description}`}
-              sx={{
-                textDecoration: item.checked ? "line-through" : "none",
-                color: item.checked ? "gray" : "inherit",
-              }}
-            />
-          )}
-        />
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="chores-list">
+            {(provided) => (
+              <Box
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                display="flex"
+                flexDirection="column"
+                gap={1}
+              >
+                {filteredItems.map((item, index) => (
+                  <Draggable
+                    key={item.id || `${index}`}
+                    draggableId={item.id || `${index}`}
+                    index={index}
+                  >
+                    {(provided) => (
+                      <Box
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                      >
+                        <ListPaper
+                          items={[item]}
+                          onItemClick={() => handleItemClick(index)}
+                          onEditClick={() => handleEditClick(index)}
+                          renderItemText={(item) => (
+                            <ListItemText
+                              primary={item.name}
+                              secondary={`Assigned to: ${item.assignee} | Description: ${item.description}`}
+                              sx={{
+                                textDecoration: item.checked
+                                  ? "line-through"
+                                  : "none",
+                                color: item.checked ? "gray" : "inherit",
+                              }}
+                            />
+                          )}
+                        />
+                      </Box>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </Box>
+            )}
+          </Droppable>
+        </DragDropContext>
       )}
 
       {!isGuest && <FloatingAddButton onClick={() => setModalOpen(true)} />}
@@ -228,6 +353,21 @@ export default function ChoresPage() {
         onSubmit={handleAddItem}
         item={editingIndex !== null ? items[editingIndex] : null}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

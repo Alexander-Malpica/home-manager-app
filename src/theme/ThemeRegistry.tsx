@@ -7,6 +7,7 @@ import { ThemeProvider, CssBaseline } from "@mui/material";
 import { lightTheme, darkTheme } from "./theme";
 import createEmotionCache from "./emotionCache";
 import { ColorModeProvider } from "./ColorModeContext";
+import { SnackbarProvider } from "notistack";
 
 export default function ThemeRegistry({
   children,
@@ -25,7 +26,7 @@ export default function ThemeRegistry({
         {(mode: string) => (
           <ThemeProvider theme={mode === "dark" ? darkTheme : lightTheme}>
             <CssBaseline />
-            {children}
+            <SnackbarProvider maxSnack={3}>{children}</SnackbarProvider>
           </ThemeProvider>
         )}
       </ColorModeProvider>

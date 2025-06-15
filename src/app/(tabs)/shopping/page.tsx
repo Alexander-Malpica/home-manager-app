@@ -1,6 +1,15 @@
 "use client";
 
-import { Box, Typography, ListItemText, Container } from "@mui/material";
+import {
+  Box,
+  Typography,
+  ListItemText,
+  Container,
+  Snackbar,
+  Alert,
+  Skeleton,
+  Button,
+} from "@mui/material";
 import EmptyState from "@/components/EmptyState";
 import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
@@ -8,11 +17,18 @@ import AddShoppingModal from "@/components/modals/AddShoppingModal";
 import ListPaper from "@/components/dashboard/lists/ListPaper";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
-import LoadingScreen from "@/components/LoadingScreen";
 import groupBy from "lodash/groupBy";
 import { useRouter } from "next/navigation";
 import useAuditLog from "@/app/hooks/useAuditLog";
 import { useMemberRole } from "@/app/hooks/useMemberRole";
+import ListSkeleton from "@/components/loaders/SkeletonList";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
+import { useSnackbar, SnackbarKey } from "notistack";
 
 interface ShoppingItem {
   id?: string;
@@ -28,12 +44,19 @@ export default function ShoppingPage() {
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({ open: false, message: "", severity: "success" });
+  const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { addLog } = useAuditLog();
   const { role, loading: roleLoading } = useMemberRole(user?.id);
   const router = useRouter();
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
   const isGuest = role === "guest";
 
@@ -46,10 +69,19 @@ export default function ShoppingPage() {
   useEffect(() => {
     if (!isSignedIn || !isLoaded) return;
 
+    setLoadingItems(true);
     fetch("/api/shopping")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => Array.isArray(data) && setItems(data))
-      .catch((err) => console.error("Unexpected error:", err));
+      .catch((err) => {
+        console.error("Unexpected error:", err);
+        setSnackbar({
+          open: true,
+          message: "Failed to load items.",
+          severity: "error",
+        });
+      })
+      .finally(() => setLoadingItems(false));
   }, [isSignedIn, isLoaded, setItems]);
 
   const handleAddItem = async (item: Omit<ShoppingItem, "id">) => {
@@ -68,8 +100,12 @@ export default function ShoppingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: existing.id, ...item }),
         });
+        setSnackbar({
+          open: true,
+          message: "Item updated.",
+          severity: "success",
+        });
       }
-
       return;
     }
 
@@ -82,6 +118,7 @@ export default function ShoppingPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+      setSnackbar({ open: true, message: "Item added.", severity: "success" });
 
       await addLog({
         action: "Added item",
@@ -90,51 +127,107 @@ export default function ShoppingPage() {
         userId: user?.id || "unknown",
         userName: user?.firstName || "Unknown",
       });
-    } else {
-      setItems((prev) => [...prev, item]);
     }
   };
 
   const handleItemClick = async (index: number) => {
     if (isGuest) return;
 
+    const itemToRemove = items[index];
+    const deletedId = itemToRemove.id;
+
+    // Optimistically update the UI
     const updated = [...items];
-    updated[index].checked = true;
+    updated.splice(index, 1);
     setItems(updated);
 
-    const itemToRemove = items[index];
+    const action = (key: SnackbarKey) => (
+      <Button
+        color="secondary"
+        size="small"
+        onClick={() => {
+          setItems((prev) => {
+            const restored = [...prev];
+            restored.splice(index, 0, itemToRemove);
+            return restored;
+          });
+
+          closeSnackbar(key);
+          // Mark the item as not to delete
+          itemAbortMap[deletedId!] = true;
+        }}
+      >
+        Undo
+      </Button>
+    );
+
+    // Keep track if undo was clicked
+    const itemAbortMap: Record<string, boolean> = {};
+
+    enqueueSnackbar("Item deleted", {
+      variant: "info",
+      action,
+      autoHideDuration: 3500,
+      anchorOrigin: { horizontal: "center", vertical: "top" },
+    });
 
     setTimeout(async () => {
-      const filtered = items.filter((_, i) => i !== index);
-      setItems(filtered);
+      if (deletedId && !itemAbortMap[deletedId]) {
+        try {
+          const res = await fetch("/api/shopping/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: deletedId }),
+          });
 
-      if (isSignedIn && itemToRemove.id) {
-        await fetch("/api/shopping/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: itemToRemove.id }),
-        });
+          if (!res.ok) {
+            throw new Error("Failed to delete from server");
+          }
 
-        await addLog({
-          action: "Completed item",
-          itemType: "shopping",
-          itemName: itemToRemove.name,
-          userId: user?.id || "unknown",
-          userName: user?.firstName || "Unknown",
-        });
+          await addLog({
+            action: "Completed item",
+            itemType: "shopping",
+            itemName: itemToRemove.name,
+            userId: user?.id || "unknown",
+            userName: user?.firstName || "Unknown",
+          });
+
+          setSnackbar({
+            open: true,
+            message: "Item permanently deleted.",
+            severity: "success",
+          });
+        } catch (error) {
+          console.error(error);
+          setSnackbar({
+            open: true,
+            message: "Server deletion failed.",
+            severity: "error",
+          });
+        }
       }
-    }, 500);
+    }, 4000);
   };
 
   const handleEditClick = (index: number) => {
     if (isGuest) return;
-
     setEditingIndex(index);
     setModalOpen(true);
   };
 
-  if (!isLoaded || !isSignedIn || roleLoading) return <LoadingScreen />;
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const newItems = Array.from(items);
+    const [moved] = newItems.splice(result.source.index, 1);
+    newItems.splice(result.destination.index, 0, moved);
+
+    setItems(newItems);
+  };
+
   const showEmpty = items.length === 0;
+
+  if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
 
   return (
     <Container sx={{ py: 4 }}>
@@ -142,7 +235,18 @@ export default function ShoppingPage() {
         🛒 Shopping List
       </Typography>
 
-      {showEmpty ? (
+      {loadingItems ? (
+        <Box px={2}>
+          {[1, 2].map((s) => (
+            <Box key={s} mt={3}>
+              <Skeleton height={30} width="30%" />
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} height={60} sx={{ my: 1 }} />
+              ))}
+            </Box>
+          ))}
+        </Box>
+      ) : showEmpty ? (
         <EmptyState message="No shopping items yet. Tap + to add one!" />
       ) : (
         Object.entries(groupBy(items, "category")).map(
@@ -152,35 +256,66 @@ export default function ShoppingPage() {
                 {category}
               </Typography>
 
-              <ListPaper
-                items={groupItems}
-                onItemClick={(index) => {
-                  if (!isGuest) {
-                    const globalIndex = items.findIndex(
-                      (i) => i.id === groupItems[index].id
-                    );
-                    handleItemClick(globalIndex);
-                  }
-                }}
-                onEditClick={(index) => {
-                  if (!isGuest) {
-                    const globalIndex = items.findIndex(
-                      (i) => i.id === groupItems[index].id
-                    );
-                    handleEditClick(globalIndex);
-                  }
-                }}
-                renderItemText={(item) => (
-                  <ListItemText
-                    primary={item.name}
-                    secondary={item.category}
-                    sx={{
-                      textDecoration: item.checked ? "line-through" : "none",
-                      color: item.checked ? "gray" : "inherit",
-                    }}
-                  />
-                )}
-              />
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId={`droppable-${category}`}>
+                  {(provided) => (
+                    <Box
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      display="flex"
+                      flexDirection="column"
+                      gap={1}
+                    >
+                      {groupItems.map((item, index) => {
+                        const globalIndex = items.findIndex(
+                          (i) => i.id === item.id
+                        );
+
+                        return (
+                          <Draggable
+                            key={item.id || `${category}-${index}`}
+                            draggableId={item.id || `${category}-${index}`}
+                            index={index}
+                          >
+                            {(provided) => (
+                              <Box
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                              >
+                                <ListPaper
+                                  items={[item]}
+                                  onItemClick={() =>
+                                    handleItemClick(globalIndex)
+                                  }
+                                  onEditClick={() =>
+                                    handleEditClick(globalIndex)
+                                  }
+                                  renderItemText={(item) => (
+                                    <ListItemText
+                                      primary={item.name}
+                                      secondary={item.category}
+                                      sx={{
+                                        textDecoration: item.checked
+                                          ? "line-through"
+                                          : "none",
+                                        color: item.checked
+                                          ? "gray"
+                                          : "inherit",
+                                      }}
+                                    />
+                                  )}
+                                />
+                              </Box>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </Box>
+                  )}
+                </Droppable>
+              </DragDropContext>
             </Box>
           )
         )
@@ -197,6 +332,21 @@ export default function ShoppingPage() {
         onSubmit={handleAddItem}
         item={editingIndex !== null ? items[editingIndex] : null}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

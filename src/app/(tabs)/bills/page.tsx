@@ -2,16 +2,33 @@
 
 import useLocalStorage from "@/app/hooks/useLocalStorage";
 import ListPaper from "@/components/dashboard/lists/ListPaper";
-import LoadingScreen from "@/components/LoadingScreen";
 import AddBillModal from "@/components/modals/AddBillModal";
 import FloatingAddButton from "@/components/navigation/FloatingAddButton";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { Typography, ListItemText, Container } from "@mui/material";
+import {
+  Typography,
+  ListItemText,
+  Container,
+  Box,
+  Skeleton,
+  Snackbar,
+  Alert,
+  Button,
+} from "@mui/material";
 import EmptyState from "@/components/EmptyState";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import useAuditLog from "@/app/hooks/useAuditLog";
 import { useMemberRole } from "@/app/hooks/useMemberRole";
+import ListSkeleton from "@/components/loaders/SkeletonList";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
+import { useSnackbar, SnackbarKey } from "notistack";
+import groupBy from "lodash/groupBy";
 
 interface BillsItem {
   id?: string;
@@ -26,12 +43,18 @@ export default function BillsPage() {
   const [items, setItems] = useLocalStorage<BillsItem[]>("billsItems", []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [isFetching, setIsFetching] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({ open: false, message: "", severity: "success" });
+  const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const { addLog } = useAuditLog();
   const router = useRouter();
+  const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
   const { role, loading: roleLoading } = useMemberRole(user?.id);
   const isGuest = role === "guest";
@@ -45,13 +68,21 @@ export default function BillsPage() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    setIsFetching(true);
+    setLoadingItems(true);
     fetch("/api/bills")
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setItems(data);
       })
-      .finally(() => setIsFetching(false));
+      .catch((err) => {
+        console.error("Unexpected error:", err);
+        setSnackbar({
+          open: true,
+          message: "Failed to load items.",
+          severity: "error",
+        });
+      })
+      .finally(() => setLoadingItems(false));
   }, [isLoaded, isSignedIn, setItems]);
 
   const handleAddItem = async (item: Omit<BillsItem, "id">) => {
@@ -70,6 +101,11 @@ export default function BillsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: existing.id, ...item }),
         });
+        setSnackbar({
+          open: true,
+          message: "Item updated.",
+          severity: "success",
+        });
       }
 
       return;
@@ -84,6 +120,7 @@ export default function BillsPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
+      setSnackbar({ open: true, message: "Item added.", severity: "success" });
 
       await addLog({
         action: "Added bill",
@@ -97,35 +134,82 @@ export default function BillsPage() {
     }
   };
 
-  const handleItemClick = (index: number) => {
+  const handleItemClick = async (index: number) => {
     if (isGuest) return;
 
+    const itemToRemove = items[index];
+    const deletedId = itemToRemove.id;
+
     const updated = [...items];
-    updated[index].checked = true;
+    updated.splice(index, 1);
     setItems(updated);
 
-    const itemToRemove = items[index];
+    const action = (key: SnackbarKey) => (
+      <Button
+        color="secondary"
+        size="small"
+        onClick={() => {
+          setItems((prev) => {
+            const restored = [...prev];
+            restored.splice(index, 0, itemToRemove);
+            return restored;
+          });
+
+          closeSnackbar(key);
+          // Mark the item as not to delete
+          itemAbortMap[deletedId!] = true;
+        }}
+      >
+        Undo
+      </Button>
+    );
+
+    // Keep track if undo was clicked
+    const itemAbortMap: Record<string, boolean> = {};
+
+    enqueueSnackbar("Item deleted", {
+      variant: "info",
+      action,
+      autoHideDuration: 3500,
+      anchorOrigin: { horizontal: "center", vertical: "top" },
+    });
 
     setTimeout(async () => {
-      const filtered = items.filter((_, i) => i !== index);
-      setItems(filtered);
+      if (deletedId && !itemAbortMap[deletedId]) {
+        try {
+          const res = await fetch("/api/bills/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: deletedId }),
+          });
 
-      if (isSignedIn && itemToRemove.id) {
-        await fetch("/api/bills/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: itemToRemove.id }),
-        });
+          if (!res.ok) {
+            throw new Error("Failed to delete from server");
+          }
 
-        await addLog({
-          action: "Marked bill as paid",
-          itemType: "bill",
-          itemName: itemToRemove.name,
-          userId: user?.id || "unknown",
-          userName: user?.firstName || "Unknown",
-        });
+          await addLog({
+            action: "Marked bill as paid",
+            itemType: "bill",
+            itemName: itemToRemove.name,
+            userId: user?.id || "unknown",
+            userName: user?.firstName || "Unknown",
+          });
+
+          setSnackbar({
+            open: true,
+            message: "Item completed and removed.",
+            severity: "success",
+          });
+        } catch (error) {
+          console.error(error);
+          setSnackbar({
+            open: true,
+            message: "Server deletion failed.",
+            severity: "error",
+          });
+        }
       }
-    }, 500);
+    }, 4000);
   };
 
   const handleEditClick = (index: number) => {
@@ -134,13 +218,23 @@ export default function BillsPage() {
     setModalOpen(true);
   };
 
-  const sortedItems = useMemo(() => {
-    return [...items].sort(
-      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-    );
-  }, [items]);
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
 
-  if (!isLoaded || isFetching || roleLoading) return <LoadingScreen />;
+    const newItems = Array.from(items);
+    const [moved] = newItems.splice(result.source.index, 1);
+    newItems.splice(result.destination.index, 0, moved);
+
+    setItems(newItems);
+  };
+
+  // const sortedItems = useMemo(() => {
+  //   return [...items].sort(
+  //     (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+  //   );
+  // }, [items]);
+
+  if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
 
   const showEmpty = items.length === 0;
 
@@ -150,32 +244,89 @@ export default function BillsPage() {
         💵 Bills
       </Typography>
 
-      {showEmpty ? (
+      {loadingItems ? (
+        <Box px={2}>
+          {[1, 2].map((s) => (
+            <Box key={s} mt={3}>
+              <Skeleton height={30} width="30%" />
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} height={60} sx={{ my: 1 }} />
+              ))}
+            </Box>
+          ))}
+        </Box>
+      ) : showEmpty ? (
         <EmptyState message="No bills yet. Tap + to add one!" />
       ) : (
-        <ListPaper
-          items={sortedItems}
-          onItemClick={handleItemClick}
-          onEditClick={handleEditClick}
-          renderItemText={(item) => (
-            <ListItemText
-              primary={item.name}
-              secondary={`$${item.amount} | Due: ${item.dueDate}`}
-              sx={{
-                textDecoration: item.checked ? "line-through" : "none",
-                color: item.checked
-                  ? "gray"
-                  : new Date(item.dueDate) < new Date()
-                  ? "red"
-                  : "inherit",
-                fontWeight:
-                  !item.checked && new Date(item.dueDate) < new Date()
-                    ? "bold"
-                    : "normal",
-              }}
-            />
-          )}
-        />
+        Object.entries(groupBy(items, "category")).map(
+          ([category, groupItems]) => (
+            <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
+              <Typography variant="h6" gutterBottom>
+                {category}
+              </Typography>
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId={`droppable-${category}`}>
+                  {(provided) => (
+                    <Box
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      display="flex"
+                      flexDirection="column"
+                      gap={1}
+                    >
+                      {groupItems.map((item, index) => {
+                        const globalIndex = items.findIndex(
+                          (i) => i.id === item.id
+                        );
+
+                        return (
+                          <Draggable
+                            key={item.id || `${category}-${index}`}
+                            draggableId={item.id || `${category}-${index}`}
+                            index={index}
+                          >
+                            {(provided) => (
+                              <Box
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                              >
+                                <ListPaper
+                                  items={[item]}
+                                  onItemClick={() =>
+                                    handleItemClick(globalIndex)
+                                  }
+                                  onEditClick={() =>
+                                    handleEditClick(globalIndex)
+                                  }
+                                  renderItemText={(item) => (
+                                    <ListItemText
+                                      primary={item.name}
+                                      secondary={item.category}
+                                      sx={{
+                                        textDecoration: item.checked
+                                          ? "line-through"
+                                          : "none",
+                                        color: item.checked
+                                          ? "gray"
+                                          : "inherit",
+                                      }}
+                                    />
+                                  )}
+                                />
+                              </Box>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </Box>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            </Box>
+          )
+        )
       )}
 
       {!isGuest && <FloatingAddButton onClick={() => setModalOpen(true)} />}
@@ -189,6 +340,21 @@ export default function BillsPage() {
         onSubmit={handleAddItem}
         item={editingIndex !== null ? items[editingIndex] : null}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }
