@@ -1,10 +1,15 @@
-
 import { Typography, Box } from "@mui/material";
 
 interface Props {
   name: string;
   greeting: string;
   date: string;
+}
+function toPascalCase(input: string) {
+  return input
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 export default function DashboardHeader({ name, greeting, date }: Props) {
@@ -15,7 +20,7 @@ export default function DashboardHeader({ name, greeting, date }: Props) {
         gutterBottom
         sx={{ fontSize: { xs: "1.5rem", sm: "2rem", md: "2.25rem" } }}
       >
-        {greeting}, {name}!
+        {greeting}, {toPascalCase(name)}!
       </Typography>
       <Typography
         variant="h6"

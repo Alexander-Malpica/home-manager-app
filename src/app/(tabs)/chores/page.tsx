@@ -41,6 +41,13 @@ interface ChoresItem {
   checked?: boolean;
 }
 
+function toPascalCase(input: string) {
+  return input
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export default function ChoresPage() {
   const [items, setItems] = useLocalStorage<ChoresItem[]>("choresItems", []);
   const [modalOpen, setModalOpen] = useState(false);
@@ -321,7 +328,9 @@ export default function ChoresPage() {
                           renderItemText={(item) => (
                             <ListItemText
                               primary={item.name}
-                              secondary={`Assigned to: ${item.assignee} | Description: ${item.description}`}
+                              secondary={`Assigned to: ${toPascalCase(
+                                item.assignee
+                              )} • Description: ${item.description}`}
                               sx={{
                                 textDecoration: item.checked
                                   ? "line-through"

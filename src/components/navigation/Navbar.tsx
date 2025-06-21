@@ -20,7 +20,7 @@ import {
   Logout,
   Settings,
   ListAlt,
-  Tune,
+  // Tune,
   Notifications as NotificationsIcon,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
@@ -207,12 +207,12 @@ export default function Navbar() {
               {theme.palette.mode === "dark" ? "Light Mode" : "Dark Mode"}
             </MenuItem>
 
-            <MenuItem onClick={() => setPreferencesModalOpen(true)}>
+            {/* <MenuItem onClick={() => setPreferencesModalOpen(true)}>
               <ListItemIcon>
                 <Tune fontSize="small" />
               </ListItemIcon>
               Preferences
-            </MenuItem>
+            </MenuItem> */}
 
             <MenuItem onClick={() => setAuditModalOpen(true)}>
               <ListItemIcon>

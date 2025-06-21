@@ -30,12 +30,20 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  // 🧹 Auto-delete logs older than 7 days
+  await prisma.auditLog.deleteMany({
+    where: {
+      createdAt: {
+        lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
+      },
+    },
+  });
+
   const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") || "1", 10);
+  const all = searchParams.get("all") === "true";
+
   const user = searchParams.get("user") || "";
   const action = searchParams.get("action") || "";
-  const take = 5;
-  const skip = (page - 1) * take;
 
   const where: Prisma.AuditLogWhereInput = {
     userName: {
@@ -48,6 +56,24 @@ export async function GET(req: NextRequest) {
     },
   };
 
+  if (all) {
+    const logs = await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    const formatted = logs.map((log) => ({
+      ...log,
+      createdAt: log.createdAt?.toISOString() ?? null,
+    }));
+
+    return NextResponse.json({ logs: formatted });
+  }
+
+  const page = parseInt(searchParams.get("page") || "1", 10);
+  const take = 5;
+  const skip = (page - 1) * take;
+
   const [logs, total] = await Promise.all([
     prisma.auditLog.findMany({
       where,
@@ -58,7 +84,6 @@ export async function GET(req: NextRequest) {
     prisma.auditLog.count({ where }),
   ]);
 
-  // ✅ Format createdAt to ISO strings for safe transport
   const formattedLogs = logs.map((log) => ({
     ...log,
     createdAt: log.createdAt?.toISOString() ?? null,

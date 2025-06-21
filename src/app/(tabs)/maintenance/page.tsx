@@ -222,11 +222,26 @@ export default function MaintenancePage() {
   };
 
   const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
+    const { source, destination } = result;
+    if (!destination) return;
 
-    const newItems = Array.from(items);
-    const [moved] = newItems.splice(result.source.index, 1);
-    newItems.splice(result.destination.index, 0, moved);
+    const sourceCategory = source.droppableId;
+    const destCategory = destination.droppableId;
+
+    // Prevent dragging across categories
+    if (sourceCategory !== destCategory) return;
+
+    const grouped = groupBy(items, "category");
+    const categoryItems = grouped[sourceCategory];
+
+    const [moved] = categoryItems.splice(source.index, 1);
+    categoryItems.splice(destination.index, 0, moved);
+
+    // Flatten back into full items array maintaining other categories
+    const newItems: MaintenanceItem[] = [];
+    for (const key of Object.keys(grouped)) {
+      newItems.push(...grouped[key]);
+    }
 
     setItems(newItems);
   };
@@ -255,15 +270,15 @@ export default function MaintenancePage() {
       ) : showEmpty ? (
         <EmptyState message="No maintenance tasks yet. Tap + to add one!" />
       ) : (
-        Object.entries(groupBy(items, "category")).map(
-          ([category, groupItems]) => (
-            <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
-              <Typography variant="h6" gutterBottom>
-                {category}
-              </Typography>
+        <DragDropContext onDragEnd={onDragEnd}>
+          {Object.entries(groupBy(items, "category")).map(
+            ([category, groupItems]) => (
+              <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
+                <Typography variant="h6" gutterBottom>
+                  {category}
+                </Typography>
 
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Droppable droppableId={`droppable-${category}`}>
+                <Droppable droppableId={category}>
                   {(provided) => (
                     <Box
                       ref={provided.innerRef}
@@ -300,14 +315,25 @@ export default function MaintenancePage() {
                                   renderItemText={(item) => (
                                     <ListItemText
                                       primary={item.title}
-                                      secondary={item.category}
-                                      sx={{
-                                        textDecoration: item.checked
-                                          ? "line-through"
-                                          : "none",
-                                        color: item.checked
-                                          ? "gray"
-                                          : "inherit",
+                                      secondary={`Description: ${item.description}`}
+                                      primaryTypographyProps={{
+                                        sx: {
+                                          textDecoration: item.checked
+                                            ? "line-through"
+                                            : "none",
+                                          color: item.checked
+                                            ? "gray"
+                                            : "inherit",
+                                          fontWeight: 500,
+                                        },
+                                      }}
+                                      secondaryTypographyProps={{
+                                        sx: {
+                                          color: item.checked
+                                            ? "lightgray"
+                                            : "text.secondary",
+                                          fontSize: "0.875rem",
+                                        },
                                       }}
                                     />
                                   )}
@@ -321,10 +347,10 @@ export default function MaintenancePage() {
                     </Box>
                   )}
                 </Droppable>
-              </DragDropContext>
-            </Box>
-          )
-        )
+              </Box>
+            )
+          )}
+        </DragDropContext>
       )}
 
       {role !== "guest" && (

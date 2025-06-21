@@ -13,6 +13,13 @@ import {
 import React from "react";
 import { useEffect, useState } from "react";
 
+function toPascalCase(input: string) {
+  return input
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 const dialogContentStyle = {
   display: "flex",
   flexDirection: "column",
@@ -114,7 +121,7 @@ export default function AddChoreModal({
           >
             {members.map((name) => (
               <MenuItem key={name} value={name}>
-                {name}
+                {toPascalCase(name)}
               </MenuItem>
             ))}
           </TextField>

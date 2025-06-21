@@ -19,6 +19,7 @@ import {
   GridToolbarColumnsButton,
   GridToolbarContainer,
 } from "@mui/x-data-grid";
+// import { GridValueGetterParams } from "@mui/x-data-grid-pro";/
 import { useEffect, useState, useMemo } from "react";
 import { saveAs } from "file-saver";
 import CloseIcon from "@mui/icons-material/Close";
@@ -36,6 +37,12 @@ interface AuditLogEntry {
 interface AuditLogsModalProps {
   open: boolean;
   onClose: () => void;
+}
+function toPascalCase(input: string) {
+  return input
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
@@ -63,7 +70,14 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
         const data = await res.json();
 
         if (Array.isArray(data.logs)) {
-          setLogs(data.logs);
+          // 💡 Convert userName and itemType to PascalCase before saving to state
+          const formattedLogs = data.logs.map((log: AuditLogEntry) => ({
+            ...log,
+            userName: toPascalCase(log.userName),
+            itemType: toPascalCase(log.itemType),
+          }));
+
+          setLogs(formattedLogs);
           setTotal(data.total);
         }
       } catch (err) {
@@ -87,54 +101,44 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
     );
   }, [logs, searchTerm]);
 
-  const handleExportCSV = () => {
-    const csv = [
-      ["Time", "User", "Action", "Type", "Item Name"],
-      ...filteredLogs.map((log) => [
-        new Date(log.createdAt).toLocaleString("en-US", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-        log.userName,
-        log.action,
-        log.itemType,
-        log.itemName,
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
+  const handleExportCSV = async () => {
+    try {
+      const res = await fetch("/api/audit-log?all=true");
+      const data = await res.json();
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    saveAs(blob, "audit-logs.csv");
+      const escapeCSV = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+      const csv = [
+        ["User", "Action", "Type", "Item Name"],
+        ...data.logs.map((log: AuditLogEntry) => [
+          escapeCSV(toPascalCase(log.userName)),
+          escapeCSV(log.action),
+          escapeCSV(toPascalCase(log.itemType)),
+          escapeCSV(log.itemName),
+        ]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      saveAs(blob, "audit-logs.csv");
+    } catch (err) {
+      console.error("Failed to download all logs:", err);
+    }
   };
 
   const columns: GridColDef[] = [
-    // {
-    //   field: "createdAt",
-    //   headerName: "Time",
-    //   width: 180,
-    //   valueFormatter: ({ value }) => {
-    //     console.log("createdAt raw value:", value);
-    //     const date = new Date(String(value));
-    //     return isNaN(date.getTime())
-    //       ? "Invalid Date"
-    //       : date.toLocaleString("en-US", {
-    //           year: "numeric",
-    //           month: "2-digit",
-    //           day: "2-digit",
-    //           hour: "2-digit",
-    //           minute: "2-digit",
-    //           second: "2-digit",
-    //         });
-    //   },
-    // },
-    { field: "userName", headerName: "User", width: 160 },
+    {
+      field: "userName",
+      headerName: "User",
+      width: 160,
+    },
     { field: "action", headerName: "Action", flex: 1 },
-    { field: "itemType", headerName: "Type", width: 120 },
+    {
+      field: "itemType",
+      headerName: "Type",
+      width: 120,
+    },
     { field: "itemName", headerName: "Item Name", flex: 1.5 },
   ];
 
@@ -156,21 +160,32 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
       </DialogTitle>
 
       <DialogContent>
-        <Stack direction="row" spacing={2} my={2} alignItems="center">
-          <TextField
-            fullWidth
-            size="small"
-            label="Search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <Button
-            onClick={handleExportCSV}
-            variant="outlined"
-            sx={{ textWrap: "nowrap" }}
-          >
-            Download CSV
-          </Button>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          my={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
+          <Box flex={{ xs: "1 1 auto", sm: 3 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </Box>
+
+          <Box flex={{ xs: "1 1 auto", sm: 1 }}>
+            <Button
+              onClick={handleExportCSV}
+              variant="outlined"
+              fullWidth
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              Download CSV
+            </Button>
+          </Box>
         </Stack>
 
         {isLoading ? (

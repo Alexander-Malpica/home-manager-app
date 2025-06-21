@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@mui/material/styles";
 
 interface Member {
+  status: string;
   id: string;
   userId: string | null;
   invitedEmail: string | null;
@@ -43,13 +44,19 @@ export default function HouseholdPage() {
   const [inviting, setInviting] = useState(false);
   const [householdOwnerId, setHouseholdOwnerId] = useState<string | null>(null);
   const [trueOwnerEmail, setTrueOwnerEmail] = useState<string | null>(null);
+  const [inviteStatus, setInviteStatus] = useState<{
+    hasInvite: boolean;
+    inviteId: string;
+    householdName: string;
+  } | null>(null);
+  const [exiting, setExiting] = useState(false);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const theme = useTheme();
 
-  const currentMember = members.find((m) => m.userId === user?.id);
+  const currentMember = members?.find((m) => m.userId === user?.id);
   const isOwner = currentMember?.role === "owner";
   const isTrueOwner = user?.id === householdOwnerId;
 
@@ -65,6 +72,14 @@ export default function HouseholdPage() {
     async function fetchMembers() {
       try {
         const res = await fetch("/api/household/members");
+        const inviteRes = await fetch("/api/household/invite-status");
+
+        if (inviteRes.ok) {
+          const inviteData = await inviteRes.json();
+          if (inviteData.hasInvite) {
+            setInviteStatus(inviteData);
+          }
+        }
 
         if (!res.ok) {
           const errorText = await res.text();
@@ -74,7 +89,7 @@ export default function HouseholdPage() {
         }
 
         const data = await res.json();
-        setMembers(data.members);
+        setMembers(Array.isArray(data.members) ? data.members : []);
         setHouseholdOwnerId(data.trueOwnerId);
         setTrueOwnerEmail(data.trueOwnerEmail);
       } catch (err) {
@@ -101,7 +116,7 @@ export default function HouseholdPage() {
       setEmail("");
       const updated = await fetch("/api/household/members");
       const data = await updated.json();
-      setMembers(data);
+      setMembers(Array.isArray(data.members) ? data.members : []);
     }
 
     setInviting(false);
@@ -132,16 +147,58 @@ export default function HouseholdPage() {
     setMembers((prev) => prev.filter((m) => m.id !== id));
   };
 
-  const handleExit = async (id: string) => {
+  const handleExit = async () => {
+    if (exiting) return; // 🛡️ Prevent double submissions
     const confirmed = confirm("Are you sure you want to leave the household?");
     if (!confirmed) return;
 
-    await fetch(`/api/household/members`, {
+    setExiting(true);
+
+    try {
+      const res = await fetch(`/api/household/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeSelf: true }),
+      });
+
+      if (res.ok) {
+        window.location.href = "/household"; // ✅ Redirect safely
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to exit household:", errorText);
+        alert("There was a problem leaving the household.");
+      }
+    } catch (error) {
+      console.error("Error during exit:", error);
+      alert("An unexpected error occurred.");
+    } finally {
+      setExiting(false); // Reset state just in case
+    }
+  };
+
+  const handleAcceptInvite = async () => {
+    if (!inviteStatus) return;
+
+    await fetch("/api/household/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, remove: true }),
+      body: JSON.stringify({ inviteId: inviteStatus.inviteId }),
     });
 
+    setInviteStatus(null);
+    window.location.reload();
+  };
+
+  const handleDeclineInvite = async () => {
+    if (!inviteStatus) return;
+
+    await fetch("/api/household/decline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteId: inviteStatus.inviteId }),
+    });
+
+    setInviteStatus(null);
     window.location.reload();
   };
 
@@ -164,6 +221,42 @@ export default function HouseholdPage() {
         Household Members
       </Typography>
 
+      {inviteStatus && (
+        <Box
+          mb={4}
+          display="flex"
+          flexDirection={{ xs: "column", sm: "row" }}
+          alignItems="center"
+          justifyContent="space-between"
+          gap={2}
+          p={2}
+          bgcolor="warning.light"
+          borderRadius={2}
+        >
+          <Typography>
+            You’ve been invited to join household:{" "}
+            <strong>{inviteStatus.householdName}</strong>
+          </Typography>
+          <Box display="flex" gap={1}>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={handleAcceptInvite}
+            >
+              Accept
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleDeclineInvite}
+            >
+              Decline
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {/* Invite Section */}
       {isOwner && (
         <Box px={{ xs: 2, sm: 3 }} py={2} display="flex" gap={2} mb={3}>
           <TextField
@@ -182,6 +275,7 @@ export default function HouseholdPage() {
         </Box>
       )}
 
+      {/* Members List */}
       <Grid container spacing={2} alignItems="stretch">
         {members.map((member) => {
           const isMemberTrueOwner = member.userId === householdOwnerId;
@@ -216,9 +310,7 @@ export default function HouseholdPage() {
                       flexWrap="wrap"
                     >
                       <Typography fontWeight="bold" noWrap>
-                        {toPascalCase(
-                          member.name || member.invitedEmail || "Unknown"
-                        )}
+                        {toPascalCase(member.name || "Unknown")}
                       </Typography>
                       {isMemberTrueOwner && (
                         <Typography fontSize="1rem" sx={{ color: "#b8860b" }}>
@@ -243,9 +335,10 @@ export default function HouseholdPage() {
                   display="flex"
                   flexWrap="wrap"
                   alignItems="center"
-                  justifyContent="flex-end"
+                  justifyContent={{ xs: "center", sm: "flex-end" }}
+                  textAlign={{ xs: "center", sm: "right" }}
                   gap={1}
-                  sx={{ mt: { xs: 2, sm: 0 } }}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
                 >
                   <Chip
                     label={member.role}
@@ -262,7 +355,11 @@ export default function HouseholdPage() {
                       fontWeight: 500,
                     }}
                   />
-                  <Chip label="active" size="small" color="success" />
+                  {member.status === "accepted" ? (
+                    <Chip label="Active" size="small" color="success" />
+                  ) : (
+                    <Chip label="Pending" size="small" color="warning" />
+                  )}
 
                   {isOwner &&
                     (member.role !== "owner" || isTrueOwner) &&
@@ -296,6 +393,7 @@ export default function HouseholdPage() {
         })}
       </Grid>
 
+      {/* Exit Button */}
       {currentMember && user?.id !== householdOwnerId && (
         <Box
           px={{ xs: 2, sm: 3 }}
@@ -313,9 +411,10 @@ export default function HouseholdPage() {
           <Button
             variant="outlined"
             color="error"
-            onClick={() => handleExit(currentMember.id)}
+            onClick={handleExit}
+            disabled={exiting}
           >
-            Exit Household
+            {exiting ? "Exiting..." : "Exit Household"}
           </Button>
         </Box>
       )}

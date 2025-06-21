@@ -86,7 +86,11 @@ export async function GET(req: NextRequest) {
       }
 
       return {
-        ...member,
+        id: member.id,
+        userId: member.userId,
+        invitedEmail: member.invitedEmail,
+        role: member.role,
+        status: member.status,
         name,
       };
     })
@@ -153,6 +157,15 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ message: "Role updated" });
+  }
+
+  // ✅ Handle self-removal
+  if (body.removeSelf === true && userId) {
+    await prisma.householdMember.deleteMany({
+      where: { userId, householdId: household.id },
+    });
+
+    return NextResponse.json({ message: "You have exited the household" });
   }
 
   // ✅ Handle remove
