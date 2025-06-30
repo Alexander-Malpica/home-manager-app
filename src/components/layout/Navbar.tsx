@@ -66,22 +66,27 @@ export default function Navbar() {
           .join(" ")
       : "";
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await fetch("/api/notifications");
-        const data: Notification[] = await res.json();
-        const unread = data.filter((n) => !n.read).length;
-        setUnreadCount(unread);
-      } catch (err) {
-        console.error("Error fetching notifications:", err);
-      }
-    };
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      const data: Notification[] = await res.json();
+      const unread = data.filter((n) => !n.read).length;
+      setUnreadCount(unread);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  };
 
+  // Fetch notifications only once when mounted
+  useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Optional: Refresh notifications when modal opens
+  const handleOpenNotifications = () => {
+    fetchNotifications();
+    setModalOpen(true);
+  };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -112,14 +117,13 @@ export default function Navbar() {
           gap: isMobile ? 1 : 0,
         }}
       >
-        {/* Logo and Title */}
         <Box display="flex" alignItems="center" gap={1}>
           <Image
             src="/logo-home-manager.webp"
             alt="Logo"
             width={40}
             height={40}
-            style={{ width: 40, height: 40, objectFit: "contain" }}
+            style={{ objectFit: "contain" }}
             priority
           />
           <Typography
@@ -131,15 +135,13 @@ export default function Navbar() {
           </Typography>
         </Box>
 
-        {/* Actions */}
         <Box
           display="flex"
           alignItems="center"
           gap={isMobile ? 1 : 2}
-          mt={isMobile ? 1 : 0}
           ml="auto"
         >
-          <IconButton onClick={() => setModalOpen(true)}>
+          <IconButton onClick={handleOpenNotifications}>
             <Badge badgeContent={unreadCount} color="error">
               <NotificationsIcon />
             </Badge>

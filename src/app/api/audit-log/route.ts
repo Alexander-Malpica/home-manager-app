@@ -3,91 +3,117 @@ import { prisma } from "@/app/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getAuth, currentUser } from "@clerk/nextjs/server";
 
-export async function POST(req: NextRequest) {
+// Constants
+const DAYS_TO_KEEP = 7;
+const PAGE_SIZE = 5;
+
+/**
+ * 🔐 Utility to get user identity from Clerk
+ */
+async function getUserIdentity(req: NextRequest) {
   const { userId } = getAuth(req);
   const user = await currentUser();
+  const email = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
-  if (!userId || !user) {
-    return new NextResponse("Unauthorized", { status: 401 });
+  if (!userId || !user || !email) {
+    throw new Error("Unauthorized");
   }
 
-  const { action, itemType, itemName } = await req.json();
-
-  const entry = await prisma.auditLog.create({
-    data: {
-      userId,
-      userName: user.firstName || "Unknown",
-      action,
-      itemType,
-      itemName,
-    },
-  });
-
-  return NextResponse.json({
-    ...entry,
-    createdAt: entry.createdAt.toISOString(), // 🛠 ensure createdAt is serialized
-  });
+  return { userId, userName: user.firstName || "Unknown" };
 }
 
-export async function GET(req: NextRequest) {
-  // 🧹 Auto-delete logs older than 7 days
-  await prisma.auditLog.deleteMany({
-    where: {
-      createdAt: {
-        lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      },
-    },
-  });
+/**
+ * 📥 POST /api/audit-log - Create a new audit log entry
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const { userId, userName } = await getUserIdentity(req);
+    const { action, itemType, itemName } = await req.json();
 
-  const { searchParams } = new URL(req.url);
-  const all = searchParams.get("all") === "true";
-
-  const user = searchParams.get("user") || "";
-  const action = searchParams.get("action") || "";
-
-  const where: Prisma.AuditLogWhereInput = {
-    userName: {
-      contains: user,
-      mode: Prisma.QueryMode.insensitive,
-    },
-    action: {
-      contains: action,
-      mode: Prisma.QueryMode.insensitive,
-    },
-  };
-
-  if (all) {
-    const logs = await prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
+    const entry = await prisma.auditLog.create({
+      data: { userId, userName, action, itemType, itemName },
     });
 
-    const formatted = logs.map((log) => ({
-      ...log,
-      createdAt: log.createdAt?.toISOString() ?? null,
-    }));
+    return NextResponse.json({
+      ...entry,
+      createdAt: entry.createdAt.toISOString(),
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.error("Something went wrong:", err.message);
+      return new NextResponse(err.message, { status: 500 });
+    }
 
-    return NextResponse.json({ logs: formatted });
+    console.error("Unexpected error:", err);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
+}
 
-  const page = parseInt(searchParams.get("page") || "1", 10);
-  const take = 5;
-  const skip = (page - 1) * take;
+/**
+ * 📤 GET /api/audit-log - Retrieve audit logs (paginated or full)
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const isAll = searchParams.get("all") === "true";
+    const userFilter = searchParams.get("user") || "";
+    const actionFilter = searchParams.get("action") || "";
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const skip = (page - 1) * PAGE_SIZE;
 
-  const [logs, total] = await Promise.all([
-    prisma.auditLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take,
-      skip,
-    }),
-    prisma.auditLog.count({ where }),
-  ]);
+    // 🧹 Remove old logs
+    await prisma.auditLog.deleteMany({
+      where: {
+        createdAt: {
+          lt: new Date(Date.now() - DAYS_TO_KEEP * 24 * 60 * 60 * 1000),
+        },
+      },
+    });
 
-  const formattedLogs = logs.map((log) => ({
-    ...log,
-    createdAt: log.createdAt?.toISOString() ?? null,
-  }));
+    const where: Prisma.AuditLogWhereInput = {
+      userName: {
+        contains: userFilter,
+        mode: Prisma.QueryMode.insensitive,
+      },
+      action: {
+        contains: actionFilter,
+        mode: Prisma.QueryMode.insensitive,
+      },
+    };
 
-  return NextResponse.json({ logs: formattedLogs, total });
+    if (isAll) {
+      const logs = await prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json({
+        logs: logs.map((log) => ({
+          ...log,
+          createdAt: log.createdAt.toISOString(),
+        })),
+      });
+    }
+
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: PAGE_SIZE,
+        skip,
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      logs: logs.map((log) => ({
+        ...log,
+        createdAt: log.createdAt.toISOString(),
+      })),
+      total,
+    });
+  } catch (err) {
+    console.error("GET /api/audit-log failed:", err);
+    return new NextResponse("Internal Server Error", { status: 500 });
+  }
 }

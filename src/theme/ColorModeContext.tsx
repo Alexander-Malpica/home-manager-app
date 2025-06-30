@@ -7,20 +7,29 @@ import {
   useState,
   useEffect,
   ReactNode,
+  FC,
 } from "react";
 
+type Mode = "light" | "dark";
+
 interface ColorModeProviderProps {
-  children: (mode: string) => ReactNode;
+  children: (mode: Mode) => ReactNode;
 }
 
-const ColorModeContext = createContext({ toggleColorMode: () => {} });
+interface ColorModeContextValue {
+  toggleColorMode: () => void;
+}
+
+const ColorModeContext = createContext<ColorModeContextValue>({
+  toggleColorMode: () => {},
+});
 
 export function useColorMode() {
   return useContext(ColorModeContext);
 }
 
-export function ColorModeProvider({ children }: ColorModeProviderProps) {
-  const [mode, setMode] = useState<"light" | "dark">("light");
+export const ColorModeProvider: FC<ColorModeProviderProps> = ({ children }) => {
+  const [mode, setMode] = useState<Mode>("light");
 
   useEffect(() => {
     const stored = localStorage.getItem("colorMode");
@@ -29,17 +38,19 @@ export function ColorModeProvider({ children }: ColorModeProviderProps) {
     }
   }, []);
 
-  const toggleColorMode = () => {
-    const nextMode = mode === "light" ? "dark" : "light";
-    setMode(nextMode);
-    localStorage.setItem("colorMode", nextMode);
-  };
+  const contextValue = useMemo(() => {
+    const toggleColorMode = () => {
+      const nextMode: Mode = mode === "light" ? "dark" : "light";
+      setMode(nextMode);
+      localStorage.setItem("colorMode", nextMode);
+    };
 
-  const value = useMemo(() => ({ toggleColorMode }), [mode]);
+    return { toggleColorMode };
+  }, [mode]);
 
   return (
-    <ColorModeContext.Provider value={value}>
+    <ColorModeContext.Provider value={contextValue}>
       {children(mode)}
     </ColorModeContext.Provider>
   );
-}
+};

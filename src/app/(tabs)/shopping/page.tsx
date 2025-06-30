@@ -10,25 +10,26 @@ import {
   Skeleton,
   Button,
 } from "@mui/material";
-import EmptyState from "@/components/EmptyState";
-import { useEffect, useState } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
-import AddShoppingModal from "@/components/modals/AddShoppingModal";
-import ListPaper from "@/components/dashboard/lists/ListPaper";
-import FloatingAddButton from "@/components/navigation/FloatingAddButton";
-import useLocalStorage from "@/app/hooks/useLocalStorage";
-import groupBy from "lodash/groupBy";
-import { useRouter } from "next/navigation";
-import useAuditLog from "@/app/hooks/useAuditLog";
-import { useMemberRole } from "@/app/hooks/useMemberRole";
-import ListSkeleton from "@/components/loaders/SkeletonList";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { useSnackbar, SnackbarKey } from "notistack";
+import groupBy from "lodash/groupBy";
+
+import ListSkeleton from "@/components/shared/SkeletonList";
+import EmptyState from "@/components/shared/EmptyState";
+import AddShoppingModal from "@/components/modals/AddShoppingModal";
+import FloatingAddButton from "@/components/layout/FloatingAddButton";
+import ListPaper from "@/components/dashboard/lists/ListPaper";
+import useAuditLog from "@/app/hooks/useAuditLog";
+import useLocalStorage from "@/app/hooks/useLocalStorage";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
 
 interface ShoppingItem {
   id?: string;
@@ -37,6 +38,12 @@ interface ShoppingItem {
   checked?: boolean;
 }
 
+const defaultSnackbar = {
+  open: false,
+  message: "",
+  severity: "success" as "success" | "error",
+};
+
 export default function ShoppingPage() {
   const [items, setItems] = useLocalStorage<ShoppingItem[]>(
     "shoppingItems",
@@ -44,28 +51,25 @@ export default function ShoppingPage() {
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState(defaultSnackbar);
   const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
-  const { addLog } = useAuditLog();
   const { role, loading: roleLoading } = useMemberRole(user?.id);
+  const { addLog } = useAuditLog();
   const router = useRouter();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
   const isGuest = role === "guest";
+  const showEmpty = items.length === 0;
 
+  // Redirect unauthenticated users
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push("/");
-    }
+    if (isLoaded && !isSignedIn) router.push("/");
   }, [isLoaded, isSignedIn, router]);
 
+  // Initial fetch
   useEffect(() => {
     if (!isSignedIn || !isLoaded) return;
 
@@ -73,8 +77,7 @@ export default function ShoppingPage() {
     fetch("/api/shopping")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => Array.isArray(data) && setItems(data))
-      .catch((err) => {
-        console.error("Unexpected error:", err);
+      .catch(() => {
         setSnackbar({
           open: true,
           message: "Failed to load items.",
@@ -87,29 +90,29 @@ export default function ShoppingPage() {
   const handleAddItem = async (item: Omit<ShoppingItem, "id">) => {
     if (isGuest) return;
 
-    if (editingIndex !== null) {
-      const existing = items[editingIndex];
+    const editing = editingIndex !== null;
+    const existing = editing ? items[editingIndex] : null;
+
+    if (editing && existing) {
       const updated = [...items];
       updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      if (isSignedIn && existing.id) {
+      if (existing.id) {
         await fetch("/api/shopping/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: existing.id, ...item }),
         });
+
         setSnackbar({
           open: true,
-          message: "Item updated.",
+          message: `Item updated: ${item.name}`,
           severity: "success",
         });
       }
-      return;
-    }
-
-    if (isSignedIn) {
+    } else {
       const res = await fetch("/api/shopping", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,11 +121,15 @@ export default function ShoppingPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
-      setSnackbar({ open: true, message: "Item added.", severity: "success" });
+      setSnackbar({
+        open: true,
+        message: `Item added: ${savedItem.name}.`,
+        severity: "success",
+      });
 
       await addLog({
         action: "Added item",
-        itemType: "shopping",
+        itemType: "Shopping",
         itemName: savedItem.name,
         userId: user?.id || "unknown",
         userName: user?.firstName || "Unknown",
@@ -130,81 +137,73 @@ export default function ShoppingPage() {
     }
   };
 
-  const handleItemClick = async (index: number) => {
+  const handleItemClick = (index: number) => {
     if (isGuest) return;
 
-    const itemToRemove = items[index];
-    const deletedId = itemToRemove.id;
-
-    // Optimistically update the UI
+    const item = items[index];
+    const deletedId = item.id;
     const updated = [...items];
     updated.splice(index, 1);
     setItems(updated);
 
-    const action = (key: SnackbarKey) => (
+    const itemAbortMap: Record<string, boolean> = {};
+
+    const undo = (key: SnackbarKey) => (
       <Button
         color="secondary"
         size="small"
         onClick={() => {
           setItems((prev) => {
             const restored = [...prev];
-            restored.splice(index, 0, itemToRemove);
+            restored.splice(index, 0, item);
             return restored;
           });
-
-          closeSnackbar(key);
-          // Mark the item as not to delete
           itemAbortMap[deletedId!] = true;
+          closeSnackbar(key);
         }}
       >
         Undo
       </Button>
     );
 
-    // Keep track if undo was clicked
-    const itemAbortMap: Record<string, boolean> = {};
-
     enqueueSnackbar("Item deleted", {
       variant: "info",
-      action,
+      action: undo,
       autoHideDuration: 3500,
       anchorOrigin: { horizontal: "center", vertical: "top" },
     });
 
     setTimeout(async () => {
-      if (deletedId && !itemAbortMap[deletedId]) {
-        try {
-          const res = await fetch("/api/shopping/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: deletedId }),
-          });
+      if (!deletedId || itemAbortMap[deletedId]) return;
 
-          if (!res.ok) {
-            throw new Error("Failed to delete from server");
-          }
+      try {
+        const res = await fetch("/api/shopping/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: deletedId }),
+        });
 
-          await addLog({
-            action: "Completed item",
-            itemType: "shopping",
-            itemName: itemToRemove.name,
-            userId: user?.id || "unknown",
-            userName: user?.firstName || "Unknown",
-          });
+        if (!res.ok) throw new Error("Failed to delete");
 
-          setSnackbar({
-            open: true,
-            message: "Item permanently deleted.",
-            severity: "success",
-          });
-        } catch (error) {
-          console.error(error);
-          setSnackbar({
-            open: true,
-            message: "Server deletion failed.",
-            severity: "error",
-          });
-        }
+        await addLog({
+          action: "Completed item",
+          itemType: "Shopping",
+          itemName: item.name,
+          userId: user?.id || "unknown",
+          userName: user?.firstName || "Unknown",
+        });
+
+        setSnackbar({
+          open: true,
+          message: `Item permanently deleted: ${item.name}`,
+          severity: "success",
+        });
+      } catch {
+        setSnackbar({
+          open: true,
+          message: "Server deletion failed.",
+          severity: "error",
+        });
       }
     }, 4000);
   };
@@ -217,30 +216,16 @@ export default function ShoppingPage() {
 
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
-    if (!destination) return;
-
-    const sourceCategory = source.droppableId;
-    const destCategory = destination.droppableId;
-
-    // Prevent dragging across categories
-    if (sourceCategory !== destCategory) return;
+    if (!destination || source.droppableId !== destination.droppableId) return;
 
     const grouped = groupBy(items, "category");
-    const categoryItems = grouped[sourceCategory];
-
+    const categoryItems = grouped[source.droppableId];
     const [moved] = categoryItems.splice(source.index, 1);
     categoryItems.splice(destination.index, 0, moved);
 
-    // Flatten back into full items array maintaining other categories
-    const newItems: ShoppingItem[] = [];
-    for (const key of Object.keys(grouped)) {
-      newItems.push(...grouped[key]);
-    }
-
-    setItems(newItems);
+    const reordered = Object.values(grouped).flat();
+    setItems(reordered);
   };
-
-  const showEmpty = items.length === 0;
 
   if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
 
@@ -267,7 +252,7 @@ export default function ShoppingPage() {
         <DragDropContext onDragEnd={onDragEnd}>
           {Object.entries(groupBy(items, "category")).map(
             ([category, groupItems]) => (
-              <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
+              <Box key={category} px={{ xs: 2, sm: 3 }} mt={2} mb={2}>
                 <Typography variant="h6" gutterBottom>
                   {category}
                 </Typography>

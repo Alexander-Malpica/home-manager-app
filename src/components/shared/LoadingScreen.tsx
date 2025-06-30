@@ -3,12 +3,10 @@ import { Box, CircularProgress } from "@mui/material";
 export default function LoadingScreen() {
   return (
     <Box
-      sx={{
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      display="flex"
+      justifyContent="center"
+      alignItems="center"
+      minHeight="100vh"
     >
       <CircularProgress size={60} thickness={5} color="primary" />
     </Box>

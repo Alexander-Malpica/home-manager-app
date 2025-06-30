@@ -11,40 +11,34 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import { ReactNode } from "react";
 
-type Props<T> = {
+interface ListPaperProps<T> {
   items: T[];
   onItemClick: (index: number) => void;
   onEditClick: (index: number) => void;
   renderItemText: (item: T) => ReactNode;
-};
+}
 
 export default function ListPaper<T>({
   items,
   onItemClick,
   onEditClick,
   renderItemText,
-}: Props<T>) {
+}: ListPaperProps<T>) {
   const theme = useTheme();
-  // const isDark = theme.palette.mode === "dark";
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        bgcolor: "transparent",
-      }}
-    >
-      <List sx={{ p: 0 }}>
-        {items.map((item, i) => (
+    <Paper elevation={0} sx={{ bgcolor: "transparent" }}>
+      <List disablePadding>
+        {items.map((item, index) => (
           <ListItem
-            key={i}
-            onClick={() => onItemClick(i)}
+            key={index}
+            onClick={() => onItemClick(index)}
             sx={{
               cursor: "pointer",
               transition: "all 0.2s ease",
               border: `1px solid ${theme.palette.divider}`,
               borderRadius: 1,
-              mb: i !== items.length - 1 ? 1.5 : 0,
+              mb: index !== items.length - 1 ? 1.5 : 0,
               px: 2,
               py: 1.5,
               bgcolor: theme.palette.background.paper,
@@ -53,11 +47,11 @@ export default function ListPaper<T>({
               alignItems: "center",
             }}
           >
-            <Box flex="1">{renderItemText(item)}</Box>
+            <Box flex={1}>{renderItemText(item)}</Box>
             <IconButton
               onClick={(e) => {
                 e.stopPropagation();
-                onEditClick(i);
+                onEditClick(index);
               }}
               color="inherit"
             >

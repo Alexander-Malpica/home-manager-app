@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Box, CircularProgress } from "@mui/material";
 
-// ✅ Lazy-load the full chart and show spinner while loading
+// Lazy-load the BillsChart component with a centered loading spinner
 const BillsChartLazy = dynamic(() => import("./BillsChartLazy"), {
   ssr: false,
   loading: () => (
@@ -11,7 +11,7 @@ const BillsChartLazy = dynamic(() => import("./BillsChartLazy"), {
       display="flex"
       justifyContent="center"
       alignItems="center"
-      height={300}
+      minHeight={300}
     >
       <CircularProgress />
     </Box>

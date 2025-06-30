@@ -28,13 +28,28 @@ interface PreferencesModalProps {
 type ThemeOption = "system" | "light" | "dark";
 type LanguageOption = "en" | "es" | "fr" | "it" | "jp";
 
+const preferencesSections = [
+  "General",
+  "Notifications",
+  "Date & Time",
+  "Audit Log",
+];
+
+const contentStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  mt: 2,
+  minHeight: 220,
+};
+
 export default function PreferencesModal({
   open,
   onClose,
 }: PreferencesModalProps) {
   const [tab, setTab] = useState(0);
-
   const { theme, setTheme, language, setLanguage } = usePreferences();
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [frequency, setFrequency] = useState("daily");
   const [timeZone, setTimeZone] = useState("UTC");
@@ -46,14 +61,6 @@ export default function PreferencesModal({
     setTab(newValue);
   };
 
-  const contentStyle = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 2,
-    mt: 2,
-    minHeight: 220,
-  };
-
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle
@@ -63,7 +70,7 @@ export default function PreferencesModal({
           alignItems: "center",
         }}
       >
-        <Typography variant="h6" component="span" fontWeight="bold">
+        <Typography variant="h6" fontWeight="bold">
           ⚙️ Preferences
         </Typography>
         <IconButton onClick={onClose}>
@@ -77,10 +84,9 @@ export default function PreferencesModal({
         variant="scrollable"
         scrollButtons="auto"
       >
-        <Tab label="General" />
-        <Tab label="Notifications" />
-        <Tab label="Date & Time" />
-        <Tab label="Audit Log" />
+        {preferencesSections.map((label) => (
+          <Tab key={label} label={label} />
+        ))}
       </Tabs>
 
       <DialogContent>
@@ -90,8 +96,8 @@ export default function PreferencesModal({
               <InputLabel>Theme</InputLabel>
               <Select
                 value={theme}
-                onChange={(e) => setTheme(e.target.value as ThemeOption)}
                 label="Theme"
+                onChange={(e) => setTheme(e.target.value as ThemeOption)}
               >
                 <MenuItem value="system">System</MenuItem>
                 <MenuItem value="light">Light</MenuItem>
@@ -102,8 +108,8 @@ export default function PreferencesModal({
               <InputLabel>Language</InputLabel>
               <Select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as LanguageOption)}
                 label="Language"
+                onChange={(e) => setLanguage(e.target.value as LanguageOption)}
               >
                 <MenuItem value="en">English</MenuItem>
                 <MenuItem value="es">Spanish</MenuItem>
@@ -130,8 +136,8 @@ export default function PreferencesModal({
               <InputLabel>Frequency</InputLabel>
               <Select
                 value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
                 label="Frequency"
+                onChange={(e) => setFrequency(e.target.value)}
               >
                 <MenuItem value="immediate">Immediate</MenuItem>
                 <MenuItem value="daily">Daily</MenuItem>
@@ -147,8 +153,8 @@ export default function PreferencesModal({
               <InputLabel>Time Zone</InputLabel>
               <Select
                 value={timeZone}
-                onChange={(e) => setTimeZone(e.target.value)}
                 label="Time Zone"
+                onChange={(e) => setTimeZone(e.target.value)}
               >
                 <MenuItem value="UTC">UTC</MenuItem>
                 <MenuItem value="America/New_York">New York</MenuItem>
@@ -159,8 +165,8 @@ export default function PreferencesModal({
               <InputLabel>Date Format</InputLabel>
               <Select
                 value={dateFormat}
-                onChange={(e) => setDateFormat(e.target.value)}
                 label="Date Format"
+                onChange={(e) => setDateFormat(e.target.value)}
               >
                 <MenuItem value="MM/DD/YYYY">MM/DD/YYYY</MenuItem>
                 <MenuItem value="DD/MM/YYYY">DD/MM/YYYY</MenuItem>
@@ -175,8 +181,8 @@ export default function PreferencesModal({
               <InputLabel>Log Retention</InputLabel>
               <Select
                 value={logRetention}
-                onChange={(e) => setLogRetention(e.target.value)}
                 label="Log Retention"
+                onChange={(e) => setLogRetention(e.target.value)}
               >
                 <MenuItem value="30">30 days</MenuItem>
                 <MenuItem value="90">90 days</MenuItem>

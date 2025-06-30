@@ -1,35 +1,31 @@
-// lib/household.ts
 import { prisma } from "@/app/lib/prisma";
 
 export const getOrCreateHousehold = async (userId: string, email: string) => {
-  // ✅ First, check if user already belongs to a household
-  const existing = await prisma.householdMember.findFirst({
+  // Check if user already belongs to a household
+  const existingMembership = await prisma.householdMember.findFirst({
     where: { userId },
     include: { Household: true },
   });
 
-  if (existing) {
-    return existing.Household;
+  if (existingMembership) {
+    return existingMembership.Household;
   }
 
-  // ✅ If the user was invited (but hasn't accepted), link them
-  const invited = await prisma.householdMember.findFirst({
+  // Check if user was invited
+  const pendingInvite = await prisma.householdMember.findFirst({
     where: { invitedEmail: email, status: "pending" },
     include: { Household: true },
   });
 
-  if (invited) {
+  if (pendingInvite) {
     await prisma.householdMember.update({
-      where: { id: invited.id },
-      data: {
-        userId,
-        status: "accepted",
-      },
+      where: { id: pendingInvite.id },
+      data: { userId, status: "accepted" },
     });
-    return invited.Household;
+    return pendingInvite.Household;
   }
 
-  // ✅ Otherwise, create a new household and assign owner role
+  // Create a new household and assign owner role
   const household = await prisma.household.create({
     data: {
       name: `${email.split("@")[0]}'s Home`,

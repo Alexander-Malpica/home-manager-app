@@ -1,20 +1,20 @@
-// components/InviteBanner.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { Box, Paper, Typography, Button } from "@mui/material";
 
-interface Props {
+interface InviteStatus {
+  hasInvite: boolean;
+  householdName: string;
+  inviteId: string;
+}
+
+interface InviteBannerProps {
   onAccepted: () => void;
 }
 
-export default function InviteBanner({ onAccepted }: Props) {
-  const [invite, setInvite] = useState<null | {
-    hasInvite: boolean;
-    householdName: string;
-    inviteId: string;
-  }>(null);
-
+export default function InviteBanner({ onAccepted }: InviteBannerProps) {
+  const [invite, setInvite] = useState<InviteStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,12 +23,10 @@ export default function InviteBanner({ onAccepted }: Props) {
         const res = await fetch("/api/household/invite-status");
         if (!res.ok) return;
 
-        const data = await res.json();
-        if (data.hasInvite) {
-          setInvite(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch invite status", err);
+        const data: InviteStatus = await res.json();
+        if (data.hasInvite) setInvite(data);
+      } catch (error) {
+        console.error("Failed to fetch invite status:", error);
       } finally {
         setLoading(false);
       }
@@ -75,8 +73,7 @@ export default function InviteBanner({ onAccepted }: Props) {
     >
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Typography variant="body1">
-          You&apos;ve been invited to join{" "}
-          <strong>{invite.householdName}</strong>
+          You’ve been invited to join <strong>{invite.householdName}</strong>
         </Typography>
         <Box display="flex" gap={1}>
           <Button variant="contained" color="primary" onClick={handleAccept}>

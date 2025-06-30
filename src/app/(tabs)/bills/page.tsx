@@ -1,26 +1,18 @@
 "use client";
 
-import useLocalStorage from "@/app/hooks/useLocalStorage";
-import ListPaper from "@/components/dashboard/lists/ListPaper";
-import AddBillModal from "@/components/modals/AddBillModal";
-import FloatingAddButton from "@/components/navigation/FloatingAddButton";
+import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import {
+  Container,
   Typography,
   ListItemText,
-  Container,
-  Box,
   Skeleton,
+  Box,
   Snackbar,
   Alert,
   Button,
 } from "@mui/material";
-import EmptyState from "@/components/EmptyState";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import useAuditLog from "@/app/hooks/useAuditLog";
-import { useMemberRole } from "@/app/hooks/useMemberRole";
-import ListSkeleton from "@/components/loaders/SkeletonList";
 import {
   DragDropContext,
   Droppable,
@@ -29,6 +21,16 @@ import {
 } from "@hello-pangea/dnd";
 import { useSnackbar, SnackbarKey } from "notistack";
 import groupBy from "lodash/groupBy";
+
+import useLocalStorage from "@/app/hooks/useLocalStorage";
+import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
+
+import ListPaper from "@/components/dashboard/lists/ListPaper";
+import AddBillModal from "@/components/modals/AddBillModal";
+import FloatingAddButton from "@/components/layout/FloatingAddButton";
+import EmptyState from "@/components/shared/EmptyState";
+import ListSkeleton from "@/components/shared/SkeletonList";
 
 interface BillsItem {
   id?: string;
@@ -39,15 +41,17 @@ interface BillsItem {
   checked?: boolean;
 }
 
+const defaultSnackbar = {
+  open: false,
+  message: "",
+  severity: "success" as "success" | "error",
+};
+
 export default function BillsPage() {
   const [items, setItems] = useLocalStorage<BillsItem[]>("billsItems", []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState(defaultSnackbar);
   const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
@@ -59,21 +63,21 @@ export default function BillsPage() {
   const { role, loading: roleLoading } = useMemberRole(user?.id);
   const isGuest = role === "guest";
 
+  // 🔒 Redirect if user not authenticated
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push("/");
     }
   }, [isLoaded, isSignedIn, router]);
 
+  // 📦 Fetch bill items
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
     setLoadingItems(true);
     fetch("/api/bills")
       .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setItems(data);
-      })
+      .then((data) => Array.isArray(data) && setItems(data))
       .catch((err) => {
         console.error("Unexpected error:", err);
         setSnackbar({
@@ -88,30 +92,29 @@ export default function BillsPage() {
   const handleAddItem = async (item: Omit<BillsItem, "id">) => {
     if (isGuest) return;
 
-    if (editingIndex !== null) {
-      const existing = items[editingIndex];
+    const editing = editingIndex !== null;
+    const existing = editing ? items[editingIndex] : null;
+
+    if (editing && existing) {
       const updated = [...items];
       updated[editingIndex] = { ...existing, ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      if (isSignedIn && existing.id) {
+      if (existing.id) {
         await fetch("/api/bills/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: existing.id, ...item }),
         });
+
         setSnackbar({
           open: true,
-          message: "Item updated.",
+          message: `Item updated: ${item.name}`,
           severity: "success",
         });
       }
-
-      return;
-    }
-
-    if (isSignedIn) {
+    } else {
       const res = await fetch("/api/bills", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,7 +123,11 @@ export default function BillsPage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
-      setSnackbar({ open: true, message: "Item added.", severity: "success" });
+      setSnackbar({
+        open: true,
+        message: `Item added: ${item.name}`,
+        severity: "success",
+      });
 
       await addLog({
         action: "Added bill",
@@ -129,22 +136,21 @@ export default function BillsPage() {
         userId: user?.id || "unknown",
         userName: user?.firstName || "Unknown",
       });
-    } else {
-      setItems((prev) => [...prev, item]);
     }
   };
 
-  const handleItemClick = async (index: number) => {
+  const handleItemClick = (index: number) => {
     if (isGuest) return;
 
     const itemToRemove = items[index];
     const deletedId = itemToRemove.id;
-
     const updated = [...items];
     updated.splice(index, 1);
     setItems(updated);
 
-    const action = (key: SnackbarKey) => (
+    const itemAbortMap: Record<string, boolean> = {};
+
+    const undoAction = (key: SnackbarKey) => (
       <Button
         color="secondary"
         size="small"
@@ -154,22 +160,17 @@ export default function BillsPage() {
             restored.splice(index, 0, itemToRemove);
             return restored;
           });
-
-          closeSnackbar(key);
-          // Mark the item as not to delete
           itemAbortMap[deletedId!] = true;
+          closeSnackbar(key);
         }}
       >
         Undo
       </Button>
     );
 
-    // Keep track if undo was clicked
-    const itemAbortMap: Record<string, boolean> = {};
-
     enqueueSnackbar("Item deleted", {
       variant: "info",
-      action,
+      action: undoAction,
       autoHideDuration: 3500,
       anchorOrigin: { horizontal: "center", vertical: "top" },
     });
@@ -183,9 +184,7 @@ export default function BillsPage() {
             body: JSON.stringify({ id: deletedId }),
           });
 
-          if (!res.ok) {
-            throw new Error("Failed to delete from server");
-          }
+          if (!res.ok) throw new Error("Failed to delete from server");
 
           await addLog({
             action: "Marked bill as paid",
@@ -197,11 +196,11 @@ export default function BillsPage() {
 
           setSnackbar({
             open: true,
-            message: "Item completed and removed.",
+            message: `Item permanently deleted: ${itemToRemove.name}`,
             severity: "success",
           });
-        } catch (error) {
-          console.error(error);
+        } catch (err) {
+          console.error(err);
           setSnackbar({
             open: true,
             message: "Server deletion failed.",
@@ -220,37 +219,19 @@ export default function BillsPage() {
 
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
-    if (!destination) return;
-
-    const sourceCategory = source.droppableId;
-    const destCategory = destination.droppableId;
-
-    // Prevent dragging across categories
-    if (sourceCategory !== destCategory) return;
+    if (!destination || source.droppableId !== destination.droppableId) return;
 
     const grouped = groupBy(items, "category");
-    const categoryItems = grouped[sourceCategory];
+    const categoryItems = grouped[source.droppableId];
 
     const [moved] = categoryItems.splice(source.index, 1);
     categoryItems.splice(destination.index, 0, moved);
 
-    // Flatten back into full items array maintaining other categories
-    const newItems: BillsItem[] = [];
-    for (const key of Object.keys(grouped)) {
-      newItems.push(...grouped[key]);
-    }
-
-    setItems(newItems);
+    const reordered = Object.values(grouped).flat();
+    setItems(reordered);
   };
 
-  // const sortedItems = useMemo(() => {
-  //   return [...items].sort(
-  //     (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-  //   );
-  // }, [items]);
-
   if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
-
   const showEmpty = items.length === 0;
 
   return (
@@ -276,7 +257,7 @@ export default function BillsPage() {
         <DragDropContext onDragEnd={onDragEnd}>
           {Object.entries(groupBy(items, "category")).map(
             ([category, groupItems]) => (
-              <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
+              <Box key={category} px={{ xs: 2, sm: 3 }} mt={2} mb={2}>
                 <Typography variant="h6" gutterBottom>
                   {category}
                 </Typography>
@@ -294,7 +275,6 @@ export default function BillsPage() {
                         const globalIndex = items.findIndex(
                           (i) => i.id === item.id
                         );
-
                         return (
                           <Draggable
                             key={item.id || `${category}-${index}`}

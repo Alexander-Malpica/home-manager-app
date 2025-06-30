@@ -1,19 +1,28 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
-interface Preferences {
-  theme: "light" | "dark" | "system";
-  language: "en" | "es" | "fr" | "it" | "jp";
-  setTheme: (theme: Preferences["theme"]) => void;
-  setLanguage: (lang: Preferences["language"]) => void;
+type ThemeMode = "light" | "dark" | "system";
+type Language = "en" | "es" | "fr" | "it" | "jp";
+
+interface PreferencesContextValue {
+  theme: ThemeMode;
+  setTheme: (theme: ThemeMode) => void;
+  language: Language;
+  setLanguage: (language: Language) => void;
 }
 
-const PreferencesContext = createContext<Preferences | undefined>(undefined);
+const PreferencesContext = createContext<PreferencesContextValue | undefined>(
+  undefined
+);
 
-export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Preferences["theme"]>("system");
-  const [language, setLanguage] = useState<Preferences["language"]>("en");
+interface PreferencesProviderProps {
+  children: ReactNode;
+}
+
+export function PreferencesProvider({ children }: PreferencesProviderProps) {
+  const [theme, setTheme] = useState<ThemeMode>("system");
+  const [language, setLanguage] = useState<Language>("en");
 
   return (
     <PreferencesContext.Provider
@@ -24,9 +33,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function usePreferences() {
+export function usePreferences(): PreferencesContextValue {
   const context = useContext(PreferencesContext);
-  if (!context)
-    throw new Error("usePreferences must be used within PreferencesProvider");
+  if (!context) {
+    throw new Error("usePreferences must be used within a PreferencesProvider");
+  }
   return context;
 }

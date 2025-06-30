@@ -14,50 +14,55 @@ interface Props {
   };
 }
 
+const summaryItemsConfig = (counts: Props["counts"]) => [
+  {
+    label: "Shopping Items",
+    value: counts.shopping,
+    icon: <ShoppingCartIcon fontSize="medium" color="primary" />,
+  },
+  {
+    label: "Unpaid Bills",
+    value: counts.bills,
+    icon: <ReceiptIcon fontSize="medium" color="primary" />,
+  },
+  {
+    label: "Pending Chores",
+    value: counts.chores,
+    icon: <CleaningServicesIcon fontSize="medium" color="primary" />,
+  },
+  {
+    label: "Maintenance Tasks",
+    value: counts.maintenance,
+    icon: <BuildIcon fontSize="medium" color="primary" />,
+  },
+];
+
 export default function SummaryCards({ counts }: Props) {
-  const summaryItems = [
-    {
-      label: "Shopping Items",
-      value: counts.shopping,
-      icon: <ShoppingCartIcon fontSize="medium" color="primary" />,
-    },
-    {
-      label: "Unpaid Bills",
-      value: counts.bills,
-      icon: <ReceiptIcon fontSize="medium" color="primary" />,
-    },
-    {
-      label: "Pending Chores",
-      value: counts.chores,
-      icon: <CleaningServicesIcon fontSize="medium" color="primary" />,
-    },
-    {
-      label: "Maintenance Tasks",
-      value: counts.maintenance,
-      icon: <BuildIcon fontSize="medium" color="primary" />,
-    },
-  ];
+  const summaryItems = summaryItemsConfig(counts);
 
   return (
     <Grid container spacing={2} sx={{ mb: 4 }}>
-      {summaryItems.map((item, index) => (
-        <Grid key={index} item xs={6} sm={6} md={3}>
+      {summaryItems.map(({ label, value, icon }) => (
+        <Grid key={label} item xs={6} md={3}>
           <Paper
+            elevation={2}
             sx={{
               p: { xs: 2, md: 3 },
               textAlign: "center",
-              height: "100%", // ✅ ensures uniform height
+              height: "100%",
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
             }}
           >
             <Box display="flex" justifyContent="center" mb={1}>
-              {item.icon}
+              {icon}
             </Box>
-            <Typography variant="h6">{item.label}</Typography>
-            <Typography variant="h4" color="primary">
-              {item.value}
+            <Typography variant="h6" fontWeight="medium">
+              {label}
+            </Typography>
+            <Typography variant="h4" color="primary" fontWeight="bold">
+              {value}
             </Typography>
           </Paper>
         </Grid>

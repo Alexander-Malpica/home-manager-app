@@ -24,14 +24,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider appearance={{}}>
-      <html lang="en" className={roboto.className} suppressHydrationWarning>
+    <ClerkProvider>
+      <html lang="en" className={roboto.className}>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          {/* <meta name="emotion-insertion-point" content="" /> */}
           <link rel="icon" href="/logo-home-manager.webp" type="image/webp" />
         </head>
-        <body suppressHydrationWarning={true}>
+        <body suppressHydrationWarning>
           <ThemeRegistry>
             <PreferencesProvider>{children}</PreferencesProvider>
           </ThemeRegistry>

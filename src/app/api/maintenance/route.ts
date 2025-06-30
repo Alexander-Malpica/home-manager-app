@@ -1,50 +1,79 @@
 import { NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { getOrCreateHousehold } from "@/app/lib/household";
+
+// 🔒 Auth utility
+async function getUserAuth() {
+  const { userId } = await auth();
+  const user = await currentUser();
+  const email = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+  if (!userId || !email) {
+    throw new Error("Unauthorized");
+  }
+
+  return { userId, email };
+}
 
 // GET /api/maintenance
 export async function GET() {
-  const { userId } = await auth();
-  const user = await currentUser();
-  const email = user?.emailAddresses[0]?.emailAddress;
+  try {
+    const { userId, email } = await getUserAuth();
+    const household = await getOrCreateHousehold(userId, email);
 
-  if (!userId || !email)
-    return new NextResponse("Unauthorized", { status: 401 });
+    const items = await prisma.maintenanceItem.findMany({
+      where: { householdId: household.id },
+      orderBy: { createdAt: "desc" },
+    });
 
-  const household = await getOrCreateHousehold(userId, email);
-
-  const items = await prisma.maintenanceItem.findMany({
-    where: { householdId: household.id },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return NextResponse.json(items);
+    return NextResponse.json(items);
+  } catch (err) {
+    console.error("GET /api/maintenance failed:", err);
+    return new NextResponse(
+      err instanceof Error && err.message === "Unauthorized"
+        ? "Unauthorized"
+        : "Internal Server Error",
+      {
+        status:
+          err instanceof Error && err.message === "Unauthorized" ? 401 : 500,
+      }
+    );
+  }
 }
 
 // POST /api/maintenance
 export async function POST(req: Request) {
-  const { userId } = await auth();
-  const user = await currentUser();
-  const email = user?.emailAddresses[0]?.emailAddress;
+  try {
+    const { userId, email } = await getUserAuth();
+    const { title, category, description = "" } = await req.json();
 
-  if (!userId || !email)
-    return new NextResponse("Unauthorized", { status: 401 });
+    if (!title || !category) {
+      return new NextResponse("Missing fields", { status: 400 });
+    }
 
-  const { title, category, description } = await req.json();
-  if (!title || !category)
-    return new NextResponse("Missing fields", { status: 400 });
+    const household = await getOrCreateHousehold(userId, email);
 
-  const household = await getOrCreateHousehold(userId, email);
+    const newItem = await prisma.maintenanceItem.create({
+      data: {
+        householdId: household.id,
+        title,
+        category,
+        description,
+      },
+    });
 
-  const newItem = await prisma.maintenanceItem.create({
-    data: {
-      householdId: household.id,
-      title,
-      category,
-      description: description || "",
-    },
-  });
-
-  return NextResponse.json(newItem);
+    return NextResponse.json(newItem);
+  } catch (err) {
+    console.error("POST /api/maintenance failed:", err);
+    return new NextResponse(
+      err instanceof Error && err.message === "Unauthorized"
+        ? "Unauthorized"
+        : "Internal Server Error",
+      {
+        status:
+          err instanceof Error && err.message === "Unauthorized" ? 401 : 500,
+      }
+    );
+  }
 }

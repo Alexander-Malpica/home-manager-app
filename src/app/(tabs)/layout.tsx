@@ -6,42 +6,41 @@ import {
   Box,
   useMediaQuery,
 } from "@mui/material";
-import {
-  Dashboard as DashboardIcon,
-  ShoppingCart as ShoppingCartIcon,
-  Receipt as ReceiptIcon,
-  CleaningServices as CleaningServicesIcon,
-  Build as BuildIcon,
-  Group as GroupIcon,
-} from "@mui/icons-material";
-import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
 import { useTheme } from "@mui/material/styles";
-import Navbar from "@/components/navigation/Navbar";
-import LoadingScreen from "@/components/LoadingScreen";
+import { usePathname, useRouter } from "next/navigation";
+import { ReactNode, useEffect, useMemo } from "react";
+import {
+  Dashboard,
+  ShoppingCart,
+  Receipt,
+  CleaningServices,
+  Build,
+  Group,
+} from "@mui/icons-material";
+import Navbar from "@/components/layout/Navbar";
+import LoadingScreen from "@/components/shared/LoadingScreen";
 import { useAuth } from "@clerk/nextjs";
 
-const paths = [
-  "/dashboard",
-  "/shopping",
-  "/bills",
-  "/chores",
-  "/maintenance",
-  "/household",
+const navItems = [
+  { label: "Dashboard", icon: <Dashboard />, path: "/dashboard" },
+  { label: "Shopping", icon: <ShoppingCart />, path: "/shopping" },
+  { label: "Bills", icon: <Receipt />, path: "/bills" },
+  { label: "Chores", icon: <CleaningServices />, path: "/chores" },
+  { label: "Maintenance", icon: <Build />, path: "/maintenance" },
+  { label: "Group", icon: <Group />, path: "/household" },
 ];
 
 export default function TabsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const [value, setValue] = useState(paths.indexOf(pathname));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
 
   const { isLoaded, isSignedIn } = useAuth();
 
-  // Update selected tab when path changes
-  useEffect(() => {
-    setValue(paths.indexOf(pathname));
+  const value = useMemo(() => {
+    const index = navItems.findIndex((item) => pathname.startsWith(item.path));
+    return index === -1 ? 0 : index;
   }, [pathname]);
 
   // Redirect to sign-in if not authenticated
@@ -51,7 +50,6 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
     }
   }, [isLoaded, isSignedIn, router]);
 
-  // Show loading screen while auth state is loading or redirecting
   if (!isLoaded || !isSignedIn) return <LoadingScreen />;
 
   return (
@@ -65,20 +63,17 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
     >
       <Navbar />
 
-      {/* Scrollable main content */}
       <Box
         sx={{
           flex: 1,
           overflowY: "auto",
           px: { xs: 2, sm: 3 },
-          pt: 0,
           pb: 3,
         }}
       >
         {children}
       </Box>
 
-      {/* Responsive sticky bottom nav */}
       <Box
         sx={{
           position: "sticky",
@@ -96,7 +91,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           showLabels
           value={value}
           onChange={(_, newValue) => {
-            router.push(paths[newValue]);
+            router.push(navItems[newValue].path);
           }}
           sx={{
             p: isMobile ? 1 : 2,
@@ -109,21 +104,13 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
             },
           }}
         >
-          <BottomNavigationAction label="Dashboard" icon={<DashboardIcon />} />
-          <BottomNavigationAction
-            label="Shopping"
-            icon={<ShoppingCartIcon />}
-          />
-          <BottomNavigationAction label="Bills" icon={<ReceiptIcon />} />
-          <BottomNavigationAction
-            label="Chores"
-            icon={<CleaningServicesIcon />}
-          />
-          <BottomNavigationAction
-            label={isMobile ? "Maint." : "Maintenance"}
-            icon={<BuildIcon />}
-          />
-          <BottomNavigationAction label="Group" icon={<GroupIcon />} />
+          {navItems.map(({ label, icon }) => (
+            <BottomNavigationAction
+              key={label}
+              label={isMobile && label === "Maintenance" ? "Maint." : label}
+              icon={icon}
+            />
+          ))}
         </BottomNavigation>
       </Box>
     </Box>

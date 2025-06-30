@@ -26,38 +26,59 @@ interface Notification {
   createdAt: string;
 }
 
+interface NotificationsModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
 export default function NotificationsModal({
   open,
   onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+}: NotificationsModalProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     if (!open) return;
-    fetch("/api/notifications")
-      .then((res) => res.json())
-      .then((data) => setNotifications(data));
+
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch("/api/notifications");
+        if (!res.ok) throw new Error("Failed to load notifications");
+        const data = await res.json();
+        setNotifications(data);
+      } catch (err) {
+        console.error("Error fetching notifications:", err);
+      }
+    };
+
+    fetchNotifications();
   }, [open]);
 
-  const grouped = groupBy(notifications, "type");
+  const groupedNotifications = groupBy(notifications, "type");
 
   const handleNotificationClick = async (id: string) => {
-    await fetch("/api/notifications/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
+    try {
+      await fetch("/api/notifications/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
 
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error("Error deleting notification:", err);
+    }
   };
 
   const handleMarkAllAsRead = async () => {
-    await fetch("/api/notifications/clear", { method: "POST" });
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    onClose();
+    try {
+      await fetch("/api/notifications/clear", { method: "POST" });
+
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      onClose();
+    } catch (err) {
+      console.error("Error marking all as read:", err);
+    }
   };
 
   return (
@@ -67,7 +88,7 @@ export default function NotificationsModal({
         {notifications.length === 0 ? (
           <Typography>No notifications yet.</Typography>
         ) : (
-          Object.entries(grouped).map(([type, group]) => (
+          Object.entries(groupedNotifications).map(([type, group]) => (
             <Box key={type} mb={2}>
               <Typography variant="h6" gutterBottom>
                 {type.toUpperCase()}
@@ -77,7 +98,6 @@ export default function NotificationsModal({
                   <ListItem
                     key={n.id}
                     divider
-                    component="div"
                     sx={{
                       cursor: "pointer",
                       "&:hover": { backgroundColor: "action.hover" },
@@ -95,11 +115,13 @@ export default function NotificationsModal({
           ))
         )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={handleMarkAllAsRead} color="primary">
-          Mark All as Read
-        </Button>
-      </DialogActions>
+      {notifications.length > 0 && (
+        <DialogActions>
+          <Button onClick={handleMarkAllAsRead} color="primary">
+            Mark All as Read
+          </Button>
+        </DialogActions>
+      )}
     </Dialog>
   );
 }

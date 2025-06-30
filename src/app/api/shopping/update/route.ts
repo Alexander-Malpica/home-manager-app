@@ -3,24 +3,46 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
 import { getOrCreateHousehold } from "@/app/lib/household";
 
-export async function POST(req: Request) {
+async function getUserAuth() {
   const { userId } = await auth();
   const user = await currentUser();
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const email = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
-  if (!userId || !email)
-    return new NextResponse("Unauthorized", { status: 401 });
+  if (!userId || !email) {
+    throw new Error("Unauthorized");
+  }
 
-  const household = await getOrCreateHousehold(userId, email);
-  const { id, name, category } = await req.json();
+  return { userId, email };
+}
 
-  if (!id || !name || !category)
-    return new NextResponse("Missing fields", { status: 400 });
+export async function POST(req: Request) {
+  try {
+    const { userId, email } = await getUserAuth();
+    const { id, name, category } = await req.json();
 
-  const updated = await prisma.shoppingItem.updateMany({
-    where: { id, householdId: household.id },
-    data: { name, category },
-  });
+    if (!id || !name || !category) {
+      return new NextResponse("Missing fields", { status: 400 });
+    }
 
-  return NextResponse.json(updated);
+    const household = await getOrCreateHousehold(userId, email);
+
+    const updated = await prisma.shoppingItem.updateMany({
+      where: { id, householdId: household.id },
+      data: { name, category },
+    });
+
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error("POST /api/shopping/update failed:", err);
+
+    return new NextResponse(
+      err instanceof Error && err.message === "Unauthorized"
+        ? "Unauthorized"
+        : "Internal Server Error",
+      {
+        status:
+          err instanceof Error && err.message === "Unauthorized" ? 401 : 500,
+      }
+    );
+  }
 }

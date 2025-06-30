@@ -3,179 +3,171 @@ import { getAuth } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
 import { getOrCreateHousehold } from "@/app/lib/household";
 
-// GET all household members with names
+const CLERK_API_BASE = "https://api.clerk.dev/v1";
+const CLERK_HEADERS = {
+  Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+};
+
+// GET /api/household/members
 export async function GET(req: NextRequest) {
-  const { userId } = getAuth(req);
-  if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
-  const userRes = await fetch(`https://api.clerk.dev/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  });
+    const userRes = await fetch(`${CLERK_API_BASE}/users/${userId}`, {
+      headers: CLERK_HEADERS,
+    });
 
-  if (!userRes.ok) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+    if (!userRes.ok) return new NextResponse("Unauthorized", { status: 401 });
 
-  const user = await userRes.json();
-  const email = user?.email_addresses?.[0]?.email_address;
-  if (!email) return new NextResponse("Unauthorized", { status: 401 });
+    const userData = await userRes.json();
+    const email = userData?.email_addresses?.[0]?.email_address;
+    if (!email) return new NextResponse("Unauthorized", { status: 401 });
 
-  const household = await prisma.household.findFirst({
-    where: {
-      members: {
-        some: {
-          OR: [{ userId: userId }, { invitedEmail: email }],
+    const household = await prisma.household.findFirst({
+      where: {
+        members: {
+          some: {
+            OR: [{ userId }, { invitedEmail: email }],
+          },
         },
       },
-    },
-    include: { members: true },
-  });
+      include: { members: true },
+    });
 
-  if (!household) {
-    return new NextResponse("No household found", { status: 404 });
-  }
+    if (!household)
+      return new NextResponse("No household found", { status: 404 });
 
-  // 🏠 Find the "true" owner (first owner with userId, sorted by id)
-  const sortedOwners = household.members
-    .filter((m) => m.role === "owner" && m.userId)
-    .sort((a, b) => a.id.localeCompare(b.id));
+    // Identify true owner
+    const owners = household.members
+      .filter((m) => m.role === "owner" && m.userId)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const trueOwner = owners[0];
 
-  const trueOwner = sortedOwners[0];
-  let trueOwnerEmail: string | null = null;
-
-  if (trueOwner?.userId) {
-    const ownerRes = await fetch(
-      `https://api.clerk.dev/v1/users/${trueOwner.userId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-        },
-      }
-    );
-    if (ownerRes.ok) {
-      const ownerData = await ownerRes.json();
-      trueOwnerEmail = ownerData?.email_addresses?.[0]?.email_address || null;
-    }
-  }
-
-  // 🧠 Resolve names for members
-  const membersWithNames = await Promise.all(
-    household.members.map(async (member) => {
-      let name = member.invitedEmail || "Unknown";
-      if (member.userId) {
-        try {
-          const userRes = await fetch(
-            `https://api.clerk.dev/v1/users/${member.userId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-              },
-            }
-          );
-          if (userRes.ok) {
-            const user = await userRes.json();
-            name = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
-          } else {
-            name = member.userId;
-          }
-        } catch {
-          name = member.userId;
+    let trueOwnerEmail: string | null = null;
+    if (trueOwner?.userId) {
+      const ownerRes = await fetch(
+        `${CLERK_API_BASE}/users/${trueOwner.userId}`,
+        {
+          headers: CLERK_HEADERS,
         }
+      );
+      if (ownerRes.ok) {
+        const ownerData = await ownerRes.json();
+        trueOwnerEmail = ownerData?.email_addresses?.[0]?.email_address || null;
       }
+    }
 
-      return {
-        id: member.id,
-        userId: member.userId,
-        invitedEmail: member.invitedEmail,
-        role: member.role,
-        status: member.status,
-        name,
-      };
-    })
-  );
+    // Enrich members with names
+    const membersWithNames = await Promise.all(
+      household.members.map(async (member) => {
+        if (member.userId) {
+          try {
+            const memberRes = await fetch(
+              `${CLERK_API_BASE}/users/${member.userId}`,
+              {
+                headers: CLERK_HEADERS,
+              }
+            );
+            if (memberRes.ok) {
+              const memberData = await memberRes.json();
+              const name = `${memberData.first_name ?? ""} ${
+                memberData.last_name ?? ""
+              }`.trim();
+              return { ...member, name };
+            }
+          } catch {}
+          return { ...member, name: member.userId };
+        }
 
-  return NextResponse.json({
-    members: membersWithNames,
-    trueOwnerId: trueOwner?.userId || null,
-    trueOwnerEmail,
-  });
+        return { ...member, name: member.invitedEmail || "Unknown" };
+      })
+    );
+
+    return NextResponse.json({
+      members: membersWithNames,
+      trueOwnerId: trueOwner?.userId ?? null,
+      trueOwnerEmail,
+    });
+  } catch (err) {
+    console.error("GET /api/household/members error:", err);
+    return new NextResponse("Internal Server Error", { status: 500 });
+  }
 }
 
-// POST: Invite user OR update role OR remove member
+// POST /api/household/members
 export async function POST(req: NextRequest) {
-  const { userId } = getAuth(req);
-  if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
-  const user = await fetch(`https://api.clerk.dev/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  }).then((res) => res.json());
-
-  const email = user?.email_addresses?.[0]?.email_address;
-  if (!email) return new NextResponse("Unauthorized", { status: 401 });
-
-  const household = await getOrCreateHousehold(userId, email);
-  const body = await req.json();
-
-  // ✅ Handle invite
-  if (body.email) {
-    const alreadyInvited = await prisma.householdMember.findFirst({
-      where: {
-        householdId: household.id,
-        invitedEmail: body.email,
-      },
+    const userRes = await fetch(`${CLERK_API_BASE}/users/${userId}`, {
+      headers: CLERK_HEADERS,
     });
+    const userData = await userRes.json();
+    const email = userData?.email_addresses?.[0]?.email_address;
+    if (!email) return new NextResponse("Unauthorized", { status: 401 });
 
-    if (alreadyInvited) {
-      return NextResponse.json({ message: "Already invited" });
+    const household = await getOrCreateHousehold(userId, email);
+    const body = await req.json();
+
+    // Invite new member
+    if (body.email) {
+      const existing = await prisma.householdMember.findFirst({
+        where: { householdId: household.id, invitedEmail: body.email },
+      });
+
+      if (existing) {
+        return NextResponse.json({ message: "Already invited" });
+      }
+
+      const invited = await prisma.householdMember.create({
+        data: {
+          householdId: household.id,
+          invitedEmail: body.email,
+          role: "member",
+        },
+      });
+
+      return NextResponse.json(invited);
     }
 
-    const invited = await prisma.householdMember.create({
-      data: {
-        householdId: household.id,
-        invitedEmail: body.email,
-        role: "member", // default role for invite
-      },
-    });
+    // Update role
+    if (body.id && body.role) {
+      const validRoles = ["owner", "member", "guest"];
+      if (!validRoles.includes(body.role)) {
+        return new NextResponse("Invalid role", { status: 400 });
+      }
 
-    return NextResponse.json(invited);
-  }
+      await prisma.householdMember.updateMany({
+        where: { id: body.id, householdId: household.id },
+        data: { role: body.role },
+      });
 
-  // ✅ Handle role update
-  if (body.id && body.role) {
-    const validRoles = ["owner", "member", "guest"];
-    if (!validRoles.includes(body.role)) {
-      return new NextResponse("Invalid role", { status: 400 });
+      return NextResponse.json({ message: "Role updated" });
     }
 
-    await prisma.householdMember.updateMany({
-      where: { id: body.id, householdId: household.id },
-      data: { role: body.role },
-    });
+    // Self-removal
+    if (body.removeSelf === true) {
+      await prisma.householdMember.deleteMany({
+        where: { userId, householdId: household.id },
+      });
 
-    return NextResponse.json({ message: "Role updated" });
+      return NextResponse.json({ message: "You have exited the household" });
+    }
+
+    // Remove member
+    if (body.id && body.remove === true) {
+      await prisma.householdMember.deleteMany({
+        where: { id: body.id, householdId: household.id },
+      });
+
+      return NextResponse.json({ message: "Member removed" });
+    }
+
+    return new NextResponse("Invalid request", { status: 400 });
+  } catch (err) {
+    console.error("POST /api/household/members error:", err);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
-
-  // ✅ Handle self-removal
-  if (body.removeSelf === true && userId) {
-    await prisma.householdMember.deleteMany({
-      where: { userId, householdId: household.id },
-    });
-
-    return NextResponse.json({ message: "You have exited the household" });
-  }
-
-  // ✅ Handle remove
-  if (body.id && body.remove === true) {
-    await prisma.householdMember.deleteMany({
-      where: { id: body.id, householdId: household.id },
-    });
-
-    return NextResponse.json({ message: "Member removed" });
-  }
-
-  return new NextResponse("Invalid request", { status: 400 });
 }

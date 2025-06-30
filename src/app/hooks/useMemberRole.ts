@@ -4,7 +4,7 @@ interface Member {
   id: string;
   userId: string | null;
   invitedEmail: string | null;
-  role: "owner" | "member" | "guest"; // Strong typing
+  role: "owner" | "member" | "guest";
   name?: string;
 }
 
@@ -14,25 +14,27 @@ export function useMemberRole(userId?: string | null) {
 
   useEffect(() => {
     if (!userId) {
+      setRole(null);
       setLoading(false);
       return;
     }
 
-    async function fetchRole() {
+    const fetchRole = async () => {
       try {
         const res = await fetch("/api/household/members");
         if (!res.ok) throw new Error("Failed to fetch members");
 
-        const data: { members: Member[] } = await res.json();
-        const current = data.members.find((m) => m.userId === userId);
-        setRole(current?.role ?? null);
-      } catch (err) {
-        console.error("Failed to get role:", err);
+        const { members }: { members: Member[] } = await res.json();
+        const user = members.find((m) => m.userId === userId);
+
+        setRole(user?.role ?? null);
+      } catch (error) {
+        console.error("useMemberRole: Error fetching member role", error);
         setRole(null);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchRole();
   }, [userId]);

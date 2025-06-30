@@ -19,7 +19,6 @@ import {
   GridToolbarColumnsButton,
   GridToolbarContainer,
 } from "@mui/x-data-grid";
-// import { GridValueGetterParams } from "@mui/x-data-grid-pro";/
 import { useEffect, useState, useMemo } from "react";
 import { saveAs } from "file-saver";
 import CloseIcon from "@mui/icons-material/Close";
@@ -38,12 +37,12 @@ interface AuditLogsModalProps {
   open: boolean;
   onClose: () => void;
 }
-function toPascalCase(input: string) {
-  return input
+
+const toPascalCase = (input: string) =>
+  input
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-}
 
 export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -62,15 +61,10 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
     const fetchLogs = async () => {
       setIsLoading(true);
       try {
-        const params = new URLSearchParams({
-          page: (page + 1).toString(),
-        });
-
-        const res = await fetch(`/api/audit-log?${params}`);
+        const res = await fetch(`/api/audit-log?page=${page + 1}`);
         const data = await res.json();
 
         if (Array.isArray(data.logs)) {
-          // 💡 Convert userName and itemType to PascalCase before saving to state
           const formattedLogs = data.logs.map((log: AuditLogEntry) => ({
             ...log,
             userName: toPascalCase(log.userName),
@@ -123,22 +117,14 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       saveAs(blob, "audit-logs.csv");
     } catch (err) {
-      console.error("Failed to download all logs:", err);
+      console.error("Failed to download logs:", err);
     }
   };
 
   const columns: GridColDef[] = [
-    {
-      field: "userName",
-      headerName: "User",
-      width: 160,
-    },
+    { field: "userName", headerName: "User", width: 160 },
     { field: "action", headerName: "Action", flex: 1 },
-    {
-      field: "itemType",
-      headerName: "Type",
-      width: 120,
-    },
+    { field: "itemType", headerName: "Type", width: 120 },
     { field: "itemName", headerName: "Item Name", flex: 1.5 },
   ];
 
@@ -151,7 +137,7 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: "flex", justifyContent: "space-between" }}>
-        <Typography variant="h6" fontWeight="bold" component="span">
+        <Typography variant="h6" fontWeight="bold">
           🧾 Audit Logs
         </Typography>
         <IconButton onClick={onClose}>
@@ -166,26 +152,21 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
           my={2}
           alignItems={{ xs: "stretch", sm: "center" }}
         >
-          <Box flex={{ xs: "1 1 auto", sm: 3 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </Box>
-
-          <Box flex={{ xs: "1 1 auto", sm: 1 }}>
-            <Button
-              onClick={handleExportCSV}
-              variant="outlined"
-              fullWidth
-              sx={{ whiteSpace: "nowrap" }}
-            >
-              Download CSV
-            </Button>
-          </Box>
+          <TextField
+            fullWidth
+            size="small"
+            label="Search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <Button
+            onClick={handleExportCSV}
+            variant="outlined"
+            fullWidth
+            sx={{ whiteSpace: "nowrap" }}
+          >
+            Download CSV
+          </Button>
         </Stack>
 
         {isLoading ? (
@@ -197,10 +178,10 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
             rows={filteredLogs}
             columns={columns}
             rowCount={total}
+            autoHeight
             pagination
             paginationMode="server"
             sortingMode="client"
-            autoHeight
             disableRowSelectionOnClick
             getRowId={(row) => row.id}
             paginationModel={{ page, pageSize }}

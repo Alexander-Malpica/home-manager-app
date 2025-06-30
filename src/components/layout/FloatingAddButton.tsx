@@ -1,17 +1,19 @@
 "use client";
 
-import { Fab } from "@mui/material";
+import { Fab, SxProps, Theme } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import { MouseEventHandler } from "react";
 
 interface Props {
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
 }
 
-const fabStyle = {
+const fabStyle: SxProps<Theme> = {
   position: "fixed",
   bottom: 90,
   left: "50%",
   transform: "translateX(-50%)",
+  zIndex: 1300,
 };
 
 export default function FloatingAddButton({ onClick }: Props) {

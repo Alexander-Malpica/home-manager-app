@@ -11,24 +11,26 @@ import {
   Button,
 } from "@mui/material";
 import { useEffect, useState } from "react";
-import EmptyState from "@/components/EmptyState";
-import FloatingAddButton from "@/components/navigation/FloatingAddButton";
-import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
-import ListPaper from "@/components/dashboard/lists/ListPaper";
-import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import useAuditLog from "@/app/hooks/useAuditLog";
-import { useMemberRole } from "@/app/hooks/useMemberRole";
-import ListSkeleton from "@/components/loaders/SkeletonList";
+import { useSnackbar, SnackbarKey } from "notistack";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
-import { useSnackbar, SnackbarKey } from "notistack";
 import groupBy from "lodash/groupBy";
+
+import useLocalStorage from "@/app/hooks/useLocalStorage";
+import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
+
+import EmptyState from "@/components/shared/EmptyState";
+import ListSkeleton from "@/components/shared/SkeletonList";
+import ListPaper from "@/components/dashboard/lists/ListPaper";
+import FloatingAddButton from "@/components/layout/FloatingAddButton";
+import AddMaintenanceModal from "@/components/modals/AddMaintenanceModal";
 
 interface MaintenanceItem {
   id?: string;
@@ -46,38 +48,39 @@ export default function MaintenancePage() {
   );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error",
+  });
   const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
-  const { addLog } = useAuditLog();
   const router = useRouter();
+  const { addLog } = useAuditLog();
   const { role, loading: roleLoading } = useMemberRole(user?.id);
-
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
   const isGuest = role === "guest";
 
+  // 🔒 Redirect if unauthenticated
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push("/");
     }
   }, [isLoaded, isSignedIn, router]);
 
+  // 🔄 Fetch maintenance items
   useEffect(() => {
-    if (!isSignedIn || !isLoaded) return;
+    if (!isLoaded || !isSignedIn) return;
 
     setLoadingItems(true);
     fetch("/api/maintenance")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => Array.isArray(data) && setItems(data))
       .catch((err) => {
-        console.error("Unexpected error:", err);
+        console.error("Failed to fetch:", err);
         setSnackbar({
           open: true,
           message: "Failed to load items.",
@@ -85,31 +88,31 @@ export default function MaintenancePage() {
         });
       })
       .finally(() => setLoadingItems(false));
-  }, [isSignedIn, isLoaded, setItems]);
+  }, [isLoaded, isSignedIn, setItems]);
 
+  // ➕ Add or update item
   const handleAddItem = async (item: Omit<MaintenanceItem, "id">) => {
-    if (role === "guest") return;
+    if (isGuest) return;
 
     if (editingIndex !== null) {
-      const existing = items[editingIndex];
       const updated = [...items];
-      updated[editingIndex] = { ...existing, ...item };
+      updated[editingIndex] = { ...items[editingIndex], ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      if (isSignedIn && existing.id) {
+      const id = items[editingIndex].id;
+      if (isSignedIn && id) {
         await fetch("/api/maintenance/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: existing.id, ...item }),
+          body: JSON.stringify({ id, ...item }),
         });
         setSnackbar({
           open: true,
-          message: "Item updated.",
+          message: `Item updated: ${item.title}`,
           severity: "success",
         });
       }
-
       return;
     }
 
@@ -122,11 +125,15 @@ export default function MaintenancePage() {
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
-      setSnackbar({ open: true, message: "Item added.", severity: "success" });
+      setSnackbar({
+        open: true,
+        message: `Item added: ${item.title}`,
+        severity: "success",
+      });
 
       await addLog({
         action: "Added maintenance",
-        itemType: "maintenance",
+        itemType: "Maintenance",
         itemName: savedItem.title,
         userId: user?.id || "unknown",
         userName: user?.firstName || "Unknown",
@@ -136,20 +143,19 @@ export default function MaintenancePage() {
     }
   };
 
+  // ✅ Remove item (with undo)
   const handleItemClick = (index: number) => {
     if (isGuest) return;
 
     const itemToRemove = items[index];
-    const deletedId = itemToRemove.id;
-
-    // Optimistically update the UI
+    const deletedId = itemToRemove.id!;
     const updated = [...items];
     updated.splice(index, 1);
     setItems(updated);
 
+    const itemAbortMap: Record<string, boolean> = {};
     const action = (key: SnackbarKey) => (
       <Button
-        color="secondary"
         size="small"
         onClick={() => {
           setItems((prev) => {
@@ -157,18 +163,13 @@ export default function MaintenancePage() {
             restored.splice(index, 0, itemToRemove);
             return restored;
           });
-
+          itemAbortMap[deletedId] = true;
           closeSnackbar(key);
-          // Mark the item as not to delete
-          itemAbortMap[deletedId!] = true;
         }}
       >
         Undo
       </Button>
     );
-
-    // Keep track if undo was clicked
-    const itemAbortMap: Record<string, boolean> = {};
 
     enqueueSnackbar("Item deleted", {
       variant: "info",
@@ -178,21 +179,17 @@ export default function MaintenancePage() {
     });
 
     setTimeout(async () => {
-      if (deletedId && !itemAbortMap[deletedId]) {
+      if (!itemAbortMap[deletedId]) {
         try {
-          const res = await fetch("/api/maintenance/delete", {
+          await fetch("/api/maintenance/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: itemToRemove.id }),
+            body: JSON.stringify({ id: deletedId }),
           });
-
-          if (!res.ok) {
-            throw new Error("Failed to delete from server");
-          }
 
           await addLog({
             action: "Completed maintenance",
-            itemType: "maintenance",
+            itemType: "Maintenance",
             itemName: itemToRemove.title,
             userId: user?.id || "unknown",
             userName: user?.firstName || "Unknown",
@@ -200,11 +197,11 @@ export default function MaintenancePage() {
 
           setSnackbar({
             open: true,
-            message: "Item permanently deleted.",
+            message: `Item permanently deleted: ${itemToRemove.title}`,
             severity: "success",
           });
-        } catch (error) {
-          console.error(error);
+        } catch (err) {
+          console.error(err);
           setSnackbar({
             open: true,
             message: "Server deletion failed.",
@@ -216,7 +213,7 @@ export default function MaintenancePage() {
   };
 
   const handleEditClick = (index: number) => {
-    if (role === "guest") return;
+    if (isGuest) return;
     setEditingIndex(index);
     setModalOpen(true);
   };
@@ -227,8 +224,6 @@ export default function MaintenancePage() {
 
     const sourceCategory = source.droppableId;
     const destCategory = destination.droppableId;
-
-    // Prevent dragging across categories
     if (sourceCategory !== destCategory) return;
 
     const grouped = groupBy(items, "category");
@@ -237,7 +232,6 @@ export default function MaintenancePage() {
     const [moved] = categoryItems.splice(source.index, 1);
     categoryItems.splice(destination.index, 0, moved);
 
-    // Flatten back into full items array maintaining other categories
     const newItems: MaintenanceItem[] = [];
     for (const key of Object.keys(grouped)) {
       newItems.push(...grouped[key]);
@@ -247,7 +241,6 @@ export default function MaintenancePage() {
   };
 
   if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
-
   const showEmpty = items.length === 0;
 
   return (
@@ -273,11 +266,10 @@ export default function MaintenancePage() {
         <DragDropContext onDragEnd={onDragEnd}>
           {Object.entries(groupBy(items, "category")).map(
             ([category, groupItems]) => (
-              <Box px={{ xs: 2, sm: 3 }} mt={2} mb={2} key={category}>
+              <Box key={category} px={{ xs: 2, sm: 3 }} mt={2} mb={2}>
                 <Typography variant="h6" gutterBottom>
                   {category}
                 </Typography>
-
                 <Droppable droppableId={category}>
                   {(provided) => (
                     <Box
@@ -291,7 +283,6 @@ export default function MaintenancePage() {
                         const globalIndex = items.findIndex(
                           (i) => i.id === item.id
                         );
-
                         return (
                           <Draggable
                             key={item.id || `${category}-${index}`}
@@ -353,7 +344,7 @@ export default function MaintenancePage() {
         </DragDropContext>
       )}
 
-      {role !== "guest" && (
+      {!isGuest && (
         <>
           <FloatingAddButton onClick={() => setModalOpen(true)} />
           <AddMaintenanceModal

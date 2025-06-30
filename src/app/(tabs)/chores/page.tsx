@@ -14,22 +14,23 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import ListPaper from "@/components/dashboard/lists/ListPaper";
-import FloatingAddButton from "@/components/navigation/FloatingAddButton";
-import AddChoreModal from "@/components/modals/AddChoreModal";
-import useLocalStorage from "@/app/hooks/useLocalStorage";
 import { useAuth, useUser } from "@clerk/nextjs";
-import EmptyState from "@/components/EmptyState";
-import useAuditLog from "@/app/hooks/useAuditLog";
-import { useMemberRole } from "@/app/hooks/useMemberRole";
-import ListSkeleton from "@/components/loaders/SkeletonList";
+import { useSnackbar, SnackbarKey } from "notistack";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
-import { useSnackbar, SnackbarKey } from "notistack";
+
+import ListPaper from "@/components/dashboard/lists/ListPaper";
+import FloatingAddButton from "@/components/layout/FloatingAddButton";
+import AddChoreModal from "@/components/modals/AddChoreModal";
+import EmptyState from "@/components/shared/EmptyState";
+import useLocalStorage from "@/app/hooks/useLocalStorage";
+import useAuditLog from "@/app/hooks/useAuditLog";
+import { useMemberRole } from "@/app/hooks/useMemberRole";
+import ListSkeleton from "@/components/shared/SkeletonList";
 
 interface ChoresItem {
   createdAt?: string | number | Date;
@@ -41,10 +42,10 @@ interface ChoresItem {
   checked?: boolean;
 }
 
-function toPascalCase(input: string) {
-  return input
+function toPascalCase(str: string): string {
+  return str
     .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
     .join(" ");
 }
 
@@ -53,20 +54,20 @@ export default function ChoresPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "today" | "assigned">("all");
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success" as "success" | "error",
+  });
   const [loadingItems, setLoadingItems] = useState(true);
 
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
-  const { addLog } = useAuditLog();
   const router = useRouter();
+  const { role, loading: roleLoading } = useMemberRole(user?.id);
+  const { addLog } = useAuditLog();
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
 
-  const { role, loading: roleLoading } = useMemberRole(user?.id);
   const isGuest = role === "guest";
 
   useEffect(() => {
@@ -76,17 +77,15 @@ export default function ChoresPage() {
   }, [isLoaded, isSignedIn, router]);
 
   useEffect(() => {
-    if (!isSignedIn || !isLoaded) return;
+    if (!isLoaded || !isSignedIn) return;
 
     setLoadingItems(true);
     fetch("/api/chores")
       .then(async (res) => {
-        if (!res.ok) {
-          const error = await res.text();
-          console.error("Failed to fetch chores:", error);
-          return;
-        }
-        const data = await res.json();
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      })
+      .then((data) => {
         if (Array.isArray(data)) setItems(data);
       })
       .catch((err) => {
@@ -98,23 +97,22 @@ export default function ChoresPage() {
         });
       })
       .finally(() => setLoadingItems(false));
-  }, [isSignedIn, isLoaded, setItems]);
+  }, [isLoaded, isSignedIn, setItems]);
 
   const handleAddItem = async (item: Omit<ChoresItem, "id">) => {
     if (isGuest) return;
 
     if (editingIndex !== null) {
-      const existing = items[editingIndex];
       const updated = [...items];
-      updated[editingIndex] = { ...existing, ...item };
+      updated[editingIndex] = { ...items[editingIndex], ...item };
       setItems(updated);
       setEditingIndex(null);
 
-      if (isSignedIn && existing.id) {
+      if (items[editingIndex].id && isSignedIn) {
         await fetch("/api/chores/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: existing.id, ...item }),
+          body: JSON.stringify({ id: items[editingIndex].id, ...item }),
         });
         setSnackbar({
           open: true,
@@ -122,7 +120,6 @@ export default function ChoresPage() {
           severity: "success",
         });
       }
-
       return;
     }
 
@@ -132,11 +129,6 @@ export default function ChoresPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Failed to save item: ${errorText}`);
-      }
 
       const savedItem = await res.json();
       setItems((prev) => [...prev, savedItem]);
@@ -159,15 +151,13 @@ export default function ChoresPage() {
 
     const itemToRemove = items[index];
     const deletedId = itemToRemove.id;
-
-    // Optimistically update the UI
     const updated = [...items];
     updated.splice(index, 1);
     setItems(updated);
 
+    const itemAbortMap: Record<string, boolean> = {};
     const action = (key: SnackbarKey) => (
       <Button
-        color="secondary"
         size="small"
         onClick={() => {
           setItems((prev) => {
@@ -175,38 +165,29 @@ export default function ChoresPage() {
             restored.splice(index, 0, itemToRemove);
             return restored;
           });
-
-          closeSnackbar(key);
-          // Mark the item as not to delete
           itemAbortMap[deletedId!] = true;
+          closeSnackbar(key);
         }}
       >
         Undo
       </Button>
     );
 
-    // Keep track if undo was clicked
-    const itemAbortMap: Record<string, boolean> = {};
-
     enqueueSnackbar("Item deleted", {
       variant: "info",
       action,
       autoHideDuration: 3500,
-      anchorOrigin: { horizontal: "center", vertical: "top" },
+      anchorOrigin: { vertical: "top", horizontal: "center" },
     });
 
     setTimeout(async () => {
       if (deletedId && !itemAbortMap[deletedId]) {
         try {
-          const res = await fetch("/api/chores/delete", {
+          await fetch("/api/chores/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: itemToRemove.id }),
+            body: JSON.stringify({ id: deletedId }),
           });
-
-          if (!res.ok) {
-            throw new Error("Failed to delete from server");
-          }
 
           await addLog({
             action: "Completed chore",
@@ -218,11 +199,10 @@ export default function ChoresPage() {
 
           setSnackbar({
             open: true,
-            message: "Item permanently deleted.",
+            message: "Item deleted.",
             severity: "success",
           });
-        } catch (error) {
-          console.error(error);
+        } catch {
           setSnackbar({
             open: true,
             message: "Server deletion failed.",
@@ -241,24 +221,19 @@ export default function ChoresPage() {
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
-
-    const newItems = Array.from(items);
+    const newItems = [...items];
     const [moved] = newItems.splice(result.source.index, 1);
     newItems.splice(result.destination.index, 0, moved);
-
     setItems(newItems);
   };
 
-  const filteredItems = items.filter((item) => {
-    if (filter === "assigned") {
-      return item.assignee.toLowerCase() === user?.fullName;
-    }
-
-    return true;
-  });
+  const filteredItems = items.filter((item) =>
+    filter === "assigned"
+      ? item.assignee.toLowerCase() === user?.fullName?.toLowerCase()
+      : true
+  );
 
   const showEmpty = filteredItems.length === 0;
-
   if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;
 
   return (
@@ -267,13 +242,11 @@ export default function ChoresPage() {
         display="flex"
         justifyContent="space-between"
         alignItems="center"
-        flexWrap="wrap"
         mb={2}
       >
         <Typography variant="h4" fontWeight="bold">
           🧹 Chores
         </Typography>
-
         <ToggleButtonGroup
           value={filter}
           exclusive
@@ -330,7 +303,7 @@ export default function ChoresPage() {
                               primary={item.name}
                               secondary={`Assigned to: ${toPascalCase(
                                 item.assignee
-                              )} • Description: ${item.description}`}
+                              )} • ${item.description}`}
                               sx={{
                                 textDecoration: item.checked
                                   ? "line-through"

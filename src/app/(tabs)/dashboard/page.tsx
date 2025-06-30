@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box } from "@mui/material";
+import { Box, Container } from "@mui/material";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import BillsChart from "@/components/dashboard/BillsChart";
-import LoadingScreen from "@/components/LoadingScreen";
+import LoadingScreen from "@/components/shared/LoadingScreen";
 
 interface MonthlyBill {
   month: string;
@@ -28,24 +29,26 @@ export default function DashboardPage() {
   });
 
   const [monthlyData, setMonthlyData] = useState<MonthlyBill[]>([]);
-  const [isFetching, setIsFetching] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(true);
 
-  // 🔒 Redirect if not signed in
+  // 🔒 Redirect to sign-in page if unauthenticated
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push("/");
     }
   }, [isLoaded, isSignedIn, router]);
 
-  // ✅ Data fetching after auth check
+  // 📊 Fetch counts and chart data
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    const initialize = async () => {
-      setIsFetching(true);
+    const fetchDashboardData = async () => {
+      setLoadingItems(true);
       try {
+        // Ensures household is initialized
         await fetch("/api/household/init");
 
+        // Fetch counts from each endpoint
         const endpoints = {
           bills: "/api/bills/count",
           chores: "/api/chores/count",
@@ -63,29 +66,26 @@ export default function DashboardPage() {
 
         setCounts(Object.fromEntries(data));
 
+        // Fetch monthly bills chart data
         const res = await fetch("/api/bills/monthly");
         const json = await res.json();
         setMonthlyData(Array.isArray(json) ? json : []);
       } catch (err) {
         console.error("Dashboard load failed:", err);
       } finally {
-        setIsFetching(false);
+        setLoadingItems(false);
       }
     };
 
-    initialize();
+    fetchDashboardData();
   }, [isLoaded, isSignedIn]);
 
-  if (!isLoaded || isFetching) {
-    return <LoadingScreen />;
-  }
+  // ⏳ Show loading state
+  if (!isLoaded || loadingItems) return <LoadingScreen />;
+  if (!isSignedIn) return null;
 
-  if (!isSignedIn) {
-    return null; // temporary while redirect happens
-  }
-
+  // 🧠 Personalized greeting
   const firstName = user?.firstName || "there";
-
   const now = new Date();
   const greeting =
     now.getHours() < 12
@@ -93,11 +93,10 @@ export default function DashboardPage() {
       : now.getHours() < 18
       ? "Good afternoon"
       : "Good evening";
-
   const formattedDate = format(now, "EEEE, MMMM d, yyyy");
 
   return (
-    <Box
+    <Container
       sx={{
         p: 2,
         mx: "auto",
@@ -116,6 +115,6 @@ export default function DashboardPage() {
           <BillsChart data={monthlyData} />
         </Box>
       </Box>
-    </Box>
+    </Container>
   );
 }

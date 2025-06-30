@@ -1,32 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "@clerk/nextjs/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { getAuth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/app/lib/prisma";
-import { createNotification } from "@/app/lib/notifications";
 import { getOrCreateHousehold } from "@/app/lib/household";
+import { createNotification } from "@/app/lib/notifications";
 
+// 🔐 Central user validation utility
+async function getUserAuth(req: NextRequest) {
+  const { userId } = getAuth(req);
+  const user = await currentUser();
+  const email = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+  if (!userId || !email) {
+    throw new Error("Unauthorized");
+  }
+
+  return { userId, email };
+}
+
+// POST /api/chores/delete
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = getAuth(req);
-    const user = await currentUser();
-    const email = user?.emailAddresses?.[0]?.emailAddress;
+    const { userId, email } = await getUserAuth(req);
+    const { id } = await req.json();
 
-    if (!userId || !email) {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (typeof id !== "string" || !id.trim()) {
+      return new NextResponse("Missing or invalid ID", { status: 400 });
     }
 
     const household = await getOrCreateHousehold(userId, email);
-    const { id } = await req.json();
-
-    if (!id) {
-      return new NextResponse("Missing ID", { status: 400 });
-    }
 
     const deleted = await prisma.choresItem.delete({
-      where: {
-        id,
-        householdId: household.id,
-      },
+      where: { id, householdId: household.id },
     });
 
     await createNotification({
@@ -38,7 +42,18 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(deleted);
   } catch (error) {
-    console.error("❌ Error in /api/chores/delete:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    console.error("❌ Error in POST /api/chores/delete:", error);
+
+    return new NextResponse(
+      error instanceof Error && error.message === "Unauthorized"
+        ? "Unauthorized"
+        : "Internal Server Error",
+      {
+        status:
+          error instanceof Error && error.message === "Unauthorized"
+            ? 401
+            : 500,
+      }
+    );
   }
 }

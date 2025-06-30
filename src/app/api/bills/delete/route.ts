@@ -4,29 +4,56 @@ import { createNotification } from "@/app/lib/notifications";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { getOrCreateHousehold } from "@/app/lib/household";
 
-export async function POST(req: Request) {
+// 🔐 Utility function to centralize user validation
+async function getUserAuth() {
   const { userId } = await auth();
   const user = await currentUser();
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const email = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
-  if (!userId || !email)
-    return new NextResponse("Unauthorized", { status: 401 });
+  if (!userId || !email) {
+    throw new Error("Unauthorized");
+  }
 
-  const household = await getOrCreateHousehold(userId, email);
-  const { id } = await req.json();
+  return { userId, email };
+}
 
-  if (!id) return new NextResponse("Missing ID", { status: 400 });
+// POST /api/bills/delete
+export async function POST(req: Request) {
+  try {
+    const { userId, email } = await getUserAuth();
+    const { id } = await req.json();
 
-  const deleted = await prisma.billsItem.delete({
-    where: { id, householdId: household.id },
-  });
+    if (!id || typeof id !== "string") {
+      return new NextResponse("Missing or invalid ID", { status: 400 });
+    }
 
-  await createNotification({
-    householdId: household.id,
-    type: "bills",
-    title: "Bill Paid",
-    body: `You paid: ${deleted.name} for $${deleted.amount}`,
-  });
+    const household = await getOrCreateHousehold(userId, email);
 
-  return NextResponse.json(deleted);
+    const deleted = await prisma.billsItem.delete({
+      where: {
+        id,
+        householdId: household.id,
+      },
+    });
+
+    await createNotification({
+      householdId: household.id,
+      type: "bills",
+      title: "Bill Paid",
+      body: `You paid: ${deleted.name} for $${deleted.amount}`,
+    });
+
+    return NextResponse.json(deleted);
+  } catch (err) {
+    console.error("POST /api/bills/delete failed:", err);
+    return new NextResponse(
+      err instanceof Error && err.message === "Unauthorized"
+        ? "Unauthorized"
+        : "Internal Server Error",
+      {
+        status:
+          err instanceof Error && err.message === "Unauthorized" ? 401 : 500,
+      }
+    );
+  }
 }
