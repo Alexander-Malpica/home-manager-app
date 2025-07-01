@@ -99,4 +99,120 @@ Here are some enhancements you can apply to your current setup for a better **UX
 
 ---
 
-Would you like me to help implement or code any of these enhancements?
+└── src/
+    ├── middleware.ts
+    ├── theme/
+    │   ├── ColorModeContext.tsx
+    │   ├── emotionCache.ts
+    │   ├── PreferencesContext.tsx
+    │   ├── theme.ts
+    │   └── ThemeRegistry.tsx
+    ├── components/
+    │   ├── EmptyState.tsx
+    │   ├── InviteBanner.tsx
+    │   ├── LoadingScreen.tsx
+    │   ├── navigation/
+    │   │   ├── FloatingAddButton.tsx
+    │   │   └── Navbar.tsx
+    │   ├── modals/
+    │   │   ├── AddBillModal.tsx
+    │   │   ├── AddChoreModal.tsx
+    │   │   ├── AddMaintenanceModal.tsx
+    │   │   ├── AddShoppingModal.tsx
+    │   │   ├── AuditLogModal.tsx
+    │   │   ├── HouseholdModal.tsx
+    │   │   ├── NotificationsModal.tsx
+    │   │   └── PreferencesModal.tsx
+    │   ├── loaders/
+    │   │   └── SkeletonList.tsx
+    │   └── dashboard/
+    │       ├── BillsChart.tsx
+    │       ├── BillsChartLazy.tsx
+    │       ├── DashboardHeader.tsx
+    │       ├── SummaryCards.tsx
+    │       └── lists/
+    │           └── ListPaper.tsx
+    └── app/
+        ├── globals.css
+        ├── layout.tsx
+        ├── page.tsx
+        ├── to-do.txt
+        ├── lib/
+        │   ├── household.ts
+        │   ├── notifications.ts
+        │   ├── prisma.ts
+        │   └── roles.ts
+        ├── hooks/
+        │   ├── useAuditLog.ts
+        │   ├── useLocalStorage.ts
+        │   ├── useMemberRole.ts
+        │   └── usePreferences.ts
+        ├── (tabs)/
+        │   ├── layout.tsx
+        │   ├── shopping/
+        │   │   └── page.tsx
+        │   ├── maintenance/
+        │   │   └── page.tsx
+        │   ├── household/
+        │   │   └── page.tsx
+        │   ├── dashboard/
+        │   │   └── page.tsx
+        │   ├── chores/
+        │   │   └── page.tsx
+        │   └── bills/
+        │       └── page.tsx
+        └── api/
+            ├── shopping/
+            │   ├── route.ts
+            │   ├── update/
+            │   │   └── route.ts
+            │   ├── delete/
+            │   │   └── route.ts
+            │   └── count/
+            │       └── route.ts
+            ├── notifications/
+            │   ├── route.ts
+            │   ├── delete/
+            │   │   └── route.ts
+            │   └── clear/
+            │       └── route.ts
+            ├── maintenance/
+            │   ├── route.ts
+            │   ├── update/
+            │   │   └── route.ts
+            │   ├── delete/
+            │   │   └── route.ts
+            │   └── count/
+            │       └── route.ts
+            ├── chores/
+            │   ├── route.ts
+            │   ├── update/
+            │   │   └── route.ts
+            │   ├── delete/
+            │   │   └── route.ts
+            │   └── count/
+            │       └── route.ts
+            ├── bills/
+            │   ├── route.ts
+            │   ├── update/
+            │   │   └── route.ts
+            │   ├── monthly/
+            │   │   └── route.ts
+            │   ├── delete/
+            │   │   └── route.ts
+            │   └── count/
+            │       └── route.ts
+            ├── audit-log/
+            │   └── route.ts
+            └── household/
+                ├── members/
+                │   └── route.ts
+                ├── invite-status/
+                │   └── route.ts
+                ├── init/
+                │   └── route.ts
+                ├── decline/
+                │   └── route.ts
+                └── accept/
+                    └── route.ts
+
