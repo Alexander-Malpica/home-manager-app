@@ -51,7 +51,7 @@ export default function HomePage() {
         <>
           <SignIn
             routing="hash"
-            fallbackRedirectUrl="/dashboard"
+            afterSignInUrl="/dashboard"
             appearance={{
               elements: {
                 card: "shadow-none bg-transparent p-0",
@@ -61,6 +61,7 @@ export default function HomePage() {
               },
             }}
           />
+
           <Typography mt={2} fontSize={14} color="text.secondary">
             New here?{" "}
             <Button
@@ -76,7 +77,7 @@ export default function HomePage() {
         <>
           <SignUp
             routing="hash"
-            fallbackRedirectUrl="/dashboard"
+            afterSignUpUrl="/dashboard"
             appearance={{
               elements: {
                 card: "shadow-none bg-transparent p-0",
@@ -86,6 +87,7 @@ export default function HomePage() {
               },
             }}
           />
+
           <Typography mt={2} fontSize={14} color="text.secondary">
             Already a member?{" "}
             <Button
