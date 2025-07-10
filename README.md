@@ -43,7 +43,7 @@ Simplify your household management with an all-in-one platform for chores, bills
 ### 1. Clone the Repo
 
 ```bash
-git clone https://github.com/your-username/home-manager-app.git
+git clone https://github.com/Alexander-Malpica/home-manager-app.git
 cd home-manager-app
 ```
 
