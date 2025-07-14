@@ -8,17 +8,26 @@ self.addEventListener("activate", () => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Only cache GET requests
+  if (event.request.method !== "GET") return;
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return (
-        cachedResponse ||
-        fetch(event.request).then((response) => {
-          return caches.open("v1").then((cache) => {
-            cache.put(event.request, response.clone());
+    caches.open("home-manager-cache-v1").then((cache) => {
+      return fetch(event.request)
+        .then((response) => {
+          // Ensure response is valid before caching
+          if (
+            !response ||
+            response.status !== 200 ||
+            response.type !== "basic"
+          ) {
             return response;
-          });
+          }
+
+          cache.put(event.request, response.clone()); // ✅ Safe to put
+          return response;
         })
-      );
+        .catch(() => cache.match(event.request)); // Fallback to cache on network failure
     })
   );
 });

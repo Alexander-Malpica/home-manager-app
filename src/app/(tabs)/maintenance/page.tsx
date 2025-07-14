@@ -218,26 +218,35 @@ export default function MaintenancePage() {
     setModalOpen(true);
   };
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     const { source, destination } = result;
-    if (!destination) return;
-
-    const sourceCategory = source.droppableId;
-    const destCategory = destination.droppableId;
-    if (sourceCategory !== destCategory) return;
+    if (!destination || source.droppableId !== destination.droppableId) return;
 
     const grouped = groupBy(items, "category");
-    const categoryItems = grouped[sourceCategory];
+    const categoryItems = grouped[source.droppableId];
 
     const [moved] = categoryItems.splice(source.index, 1);
     categoryItems.splice(destination.index, 0, moved);
 
-    const newItems: MaintenanceItem[] = [];
-    for (const key of Object.keys(grouped)) {
-      newItems.push(...grouped[key]);
-    }
+    const reordered = Object.values(grouped).flat();
+    setItems(reordered);
 
-    setItems(newItems);
+    const orderedIds = reordered.map((item) => item.id).filter(Boolean);
+
+    try {
+      await fetch("/api/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+    } catch (err) {
+      console.error("Failed to persist drag-and-drop order:", err);
+      setSnackbar?.({
+        open: true,
+        message: "Failed to save new order.",
+        severity: "error",
+      });
+    }
   };
 
   if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;

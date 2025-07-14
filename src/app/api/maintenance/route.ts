@@ -24,7 +24,7 @@ export async function GET() {
 
     const items = await prisma.maintenanceItem.findMany({
       where: { householdId: household.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: { position: "asc" },
     });
 
     return NextResponse.json(items);
@@ -46,13 +46,36 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { userId, email } = await getUserAuth();
-    const { title, category, description = "" } = await req.json();
+    const household = await getOrCreateHousehold(userId, email);
+
+    const body = await req.json();
+
+    // ✅ Handle reorder request
+    if (Array.isArray(body.orderedIds)) {
+      await Promise.all(
+        body.orderedIds.map((id: string, index: number) =>
+          prisma.maintenanceItem.update({
+            where: { id },
+            data: { position: index },
+          })
+        )
+      );
+      return new NextResponse("Positions updated", { status: 200 });
+    }
+
+    // ✅ Handle new item creation
+    const { title, category, description = "" } = body;
 
     if (!title || !category) {
       return new NextResponse("Missing fields", { status: 400 });
     }
 
-    const household = await getOrCreateHousehold(userId, email);
+    const maxItem = await prisma.shoppingItem.findFirst({
+      where: { householdId: household.id },
+      orderBy: { position: "desc" },
+    });
+
+    const nextPosition = (maxItem?.position ?? -1) + 1;
 
     const newItem = await prisma.maintenanceItem.create({
       data: {
@@ -60,6 +83,7 @@ export async function POST(req: Request) {
         title,
         category,
         description,
+        position: nextPosition,
       },
     });
 

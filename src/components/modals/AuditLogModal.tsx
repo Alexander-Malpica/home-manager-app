@@ -137,7 +137,7 @@ export default function AuditLogsModal({ open, onClose }: AuditLogsModalProps) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: "flex", justifyContent: "space-between" }}>
-        <Typography variant="h6" fontWeight="bold">
+        <Typography component="span" variant="h6" fontWeight="bold">
           🧾 Audit Logs
         </Typography>
         <IconButton onClick={onClose}>

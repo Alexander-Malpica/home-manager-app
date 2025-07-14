@@ -219,12 +219,37 @@ export default function ChoresPage() {
     setModalOpen(true);
   };
 
-  const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-    const newItems = [...items];
-    const [moved] = newItems.splice(result.source.index, 1);
-    newItems.splice(result.destination.index, 0, moved);
-    setItems(newItems);
+  const onDragEnd = async (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination || source.droppableId !== destination.droppableId) return;
+
+    const grouped: { [key: string]: ChoresItem[] } = {
+      "chores-list": [...items],
+    };
+    const categoryItems = grouped[source.droppableId];
+    const [moved] = categoryItems.splice(source.index, 1);
+    categoryItems.splice(destination.index, 0, moved);
+
+    const reordered = Object.values(grouped).flat();
+
+    setItems(reordered);
+
+    const orderedIds = reordered.map((item) => item.id).filter(Boolean);
+
+    try {
+      await fetch("/api/chores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+    } catch (err) {
+      console.error("Failed to persist drag-and-drop order:", err);
+      setSnackbar({
+        open: true,
+        message: "Failed to save new order.",
+        severity: "error",
+      });
+    }
   };
 
   const filteredItems = items.filter((item) =>

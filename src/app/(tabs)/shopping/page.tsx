@@ -214,7 +214,7 @@ export default function ShoppingPage() {
     setModalOpen(true);
   };
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     const { source, destination } = result;
     if (!destination || source.droppableId !== destination.droppableId) return;
 
@@ -224,7 +224,25 @@ export default function ShoppingPage() {
     categoryItems.splice(destination.index, 0, moved);
 
     const reordered = Object.values(grouped).flat();
+
     setItems(reordered);
+
+    const orderedIds = reordered.map((item) => item.id).filter(Boolean);
+
+    try {
+      await fetch("/api/shopping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds }),
+      });
+    } catch (err) {
+      console.error("Failed to persist drag-and-drop order:", err);
+      setSnackbar({
+        open: true,
+        message: "Failed to save new order.",
+        severity: "error",
+      });
+    }
   };
 
   if (!isLoaded || !isSignedIn || roleLoading) return <ListSkeleton />;

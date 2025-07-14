@@ -34,7 +34,7 @@ export default function BillsChartLazy({ data }: Props) {
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
             <XAxis dataKey="month" />
-            <YAxis />
+            <YAxis dataKey="amount ($)" />
             <Tooltip />
             <Legend />
             <Bar

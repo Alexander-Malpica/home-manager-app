@@ -225,7 +225,7 @@ export default function Navbar() {
 
             <Divider />
 
-            <MenuItem onClick={() => signOut()}>
+            <MenuItem onClick={() => signOut({ redirectUrl: "/" })}>
               <ListItemIcon>
                 <Logout fontSize="small" />
               </ListItemIcon>

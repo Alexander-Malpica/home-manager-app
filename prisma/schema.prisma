@@ -12,6 +12,7 @@ model ShoppingItem {
   householdId  String
   name         String
   category     String
+  position     Int      @default(0)
   checked      Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
@@ -23,6 +24,7 @@ model BillsItem {
   amount       Float
   dueDate      DateTime
   category     String
+  position     Int      @default(0)
   checked      Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
@@ -33,6 +35,7 @@ model ChoresItem {
   name         String
   assignee     String
   description  String
+  position     Int      @default(0)
   checked      Boolean  @default(false)
   recurrence   String   @default("none")
   createdAt    DateTime @default(now())
@@ -44,6 +47,7 @@ model MaintenanceItem {
   title        String
   category     String
   description  String
+  position     Int      @default(0)
   checked      Boolean  @default(false)
   recurrence   String   @default("none")
   createdAt    DateTime @default(now())

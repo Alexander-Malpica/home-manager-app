@@ -24,7 +24,7 @@ export async function GET() {
 
     const items = await prisma.billsItem.findMany({
       where: { householdId: household.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: { position: "asc" },
     });
 
     return NextResponse.json(items);
@@ -46,13 +46,37 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { userId, email } = await getUserAuth();
-    const { name, amount, dueDate, category } = await req.json();
+
+    const household = await getOrCreateHousehold(userId, email);
+
+    const body = await req.json();
+
+    // ✅ Handle reorder request
+    if (Array.isArray(body.orderedIds)) {
+      await Promise.all(
+        body.orderedIds.map((id: string, index: number) =>
+          prisma.billsItem.update({
+            where: { id },
+            data: { position: index },
+          })
+        )
+      );
+      return new NextResponse("Positions updated", { status: 200 });
+    }
+
+    // ✅ Handle new item creation
+    const { name, amount, dueDate, category } = body;
 
     if (!name || !amount || !dueDate || !category) {
       return new NextResponse("Missing fields", { status: 400 });
     }
 
-    const household = await getOrCreateHousehold(userId, email);
+    const maxItem = await prisma.shoppingItem.findFirst({
+      where: { householdId: household.id },
+      orderBy: { position: "desc" },
+    });
+
+    const nextPosition = (maxItem?.position ?? -1) + 1;
 
     const newItem = await prisma.billsItem.create({
       data: {
@@ -61,6 +85,7 @@ export async function POST(req: Request) {
         amount: parseFloat(amount),
         dueDate: new Date(dueDate),
         category,
+        position: nextPosition,
       },
     });
 
